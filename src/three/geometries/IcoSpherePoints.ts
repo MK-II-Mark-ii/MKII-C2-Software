@@ -47,15 +47,17 @@ export function extractWireframeEdges(triangles: Uint32Array): Uint32Array {
 }
 
 /**
- * 5 algorithm axes distributed as uniformly as possible in 3D.
- * Uses vertices of a triangular bipyramid for near-equal angular separation (~63-90° between axes).
+ * 5 algorithm axes: 1 top pole + 4 equally spaced at 90° azimuthal intervals.
+ * Bottom 4 sit at polar angle ~109.47° from top (tetrahedral angle, y = -1/3).
+ * All directions are unit vectors on the sphere.
  */
+const R = 0.9428 // sin(arccos(-1/3)) = 2√2/3, radius in xz-plane at y = -1/3
 export const ALGORITHM_AXES: { name: string; dir: [number, number, number] }[] = [
-  { name: 'INS',  dir: [0, 1, 0] },                                    // top
-  { name: 'GNSS', dir: [0.943, -0.333, 0] },                           // front-right-low
-  { name: 'TER',  dir: [0.291, -0.333, 0.897] },                       // back-right-low
-  { name: 'MAG',  dir: [-0.764, -0.333, 0.554] },                      // back-left-low
-  { name: 'SCN',  dir: [-0.471, -0.333, -0.816] },                     // front-left-low
+  { name: 'INS',  dir: [0, 1, 0] },               // top pole
+  { name: 'GNSS', dir: [R, -0.3333, 0] },          // +X  (0°)
+  { name: 'TER',  dir: [0, -0.3333, R] },           // +Z  (90°)
+  { name: 'MAG',  dir: [-R, -0.3333, 0] },          // -X  (180°)
+  { name: 'SCN',  dir: [0, -0.3333, -R] },          // -Z  (270°)
 ]
 
 /**
