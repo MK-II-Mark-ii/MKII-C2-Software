@@ -9,13 +9,13 @@ const MODEL_PATH = `${import.meta.env.BASE_URL}models/shahed136.glb`
 const COMPASS_RADIUS = 1.6
 const CYAN = '#00E5FF'
 
-// --- 3D Compass Ring (rendered in scene beneath aircraft) ---
+// --- 3D Compass Ring (fixed orientation — N always at +Z, only heading pointer rotates) ---
 function CompassRing3D() {
-  const groupRef = useRef<THREE.Group>(null)
+  const pointerRef = useRef<THREE.Group>(null)
   const targetYaw = useRef(0)
 
   useFrame(() => {
-    if (!groupRef.current) return
+    if (!pointerRef.current) return
     const values = useTelemetryStore.getState().values
     const yaw = (values.psi ?? 0) * Math.PI / 180
 
@@ -24,7 +24,8 @@ function CompassRing3D() {
     if (diff < -Math.PI) diff += 2 * Math.PI
     targetYaw.current += diff * 0.08
 
-    groupRef.current.rotation.y = -targetYaw.current
+    // Only rotate the heading pointer, not the whole compass
+    pointerRef.current.rotation.y = -targetYaw.current
   })
 
   // Ring circle points
@@ -58,8 +59,8 @@ function CompassRing3D() {
   const cardinals: [number, string][] = [[0, 'N'], [90, 'E'], [180, 'S'], [270, 'W']]
 
   return (
-    <group ref={groupRef} position={[0, -0.9, 0]}>
-      {/* Main ring */}
+    <group position={[0, -0.9, 0]}>
+      {/* Fixed compass ring — N always at +Z (top of view) */}
       <Line points={ringPoints} color={CYAN} lineWidth={1} transparent opacity={0.4} />
 
       {/* Tick marks */}
@@ -74,7 +75,7 @@ function CompassRing3D() {
         />
       ))}
 
-      {/* Cardinal labels */}
+      {/* Cardinal labels — fixed */}
       {cardinals.map(([deg, label]) => {
         const rad = deg * Math.PI / 180
         const labelR = COMPASS_RADIUS + 0.2
@@ -93,11 +94,13 @@ function CompassRing3D() {
         )
       })}
 
-      {/* Heading pointer triangle at north */}
-      <mesh position={[0, 0.02, COMPASS_RADIUS - 0.05]} rotation={[-Math.PI / 2, 0, 0]}>
-        <coneGeometry args={[0.06, 0.12, 3]} />
-        <meshBasicMaterial color={CYAN} />
-      </mesh>
+      {/* Heading pointer — rotates with yaw to show current heading */}
+      <group ref={pointerRef}>
+        <mesh position={[0, 0.02, COMPASS_RADIUS - 0.05]} rotation={[-Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.06, 0.12, 3]} />
+          <meshBasicMaterial color={CYAN} />
+        </mesh>
+      </group>
     </group>
   )
 }
