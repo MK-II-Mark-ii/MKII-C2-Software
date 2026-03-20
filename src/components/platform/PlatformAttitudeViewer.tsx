@@ -144,6 +144,10 @@ function PlatformModel() {
     clone.position.set(-center.x * scale, -center.y * scale, -center.z * scale)
     clone.scale.setScalar(scale)
 
+    // Rotate model so nose points along -Z (Three.js forward convention)
+    // Most CAD exports have nose along +Y or +X — try +Y first
+    clone.rotation.set(-Math.PI / 2, 0, 0)
+
     // Visible light grey body
     clone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {

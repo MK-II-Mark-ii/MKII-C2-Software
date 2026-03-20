@@ -1,11 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTelemetryStore } from '../../stores/telemetryStore'
 
 // Mission route
 const ORIGIN = { lat: 26.8882, lng: 70.9150 }  // Jaisalmer AF Station
 const TARGET = { lat: 31.802, lng: 74.255 }     // Muridke, Pakistan
 
-// Interpolate planned route as straight-line waypoints
 function generatePlannedRoute(steps = 100): { lat: number; lng: number }[] {
   const pts: { lat: number; lng: number }[] = []
   for (let i = 0; i <= steps; i++) {
@@ -19,23 +18,6 @@ function generatePlannedRoute(steps = 100): { lat: number; lng: number }[] {
 }
 
 const PHASE_LABELS = ['PRE_LCH', 'LAUNCH', 'CLIMB', 'CRUISE', 'LOITER', 'INGRESS', 'TERMINAL', 'POST_MSN']
-
-function makeLmIcon(phase: string, speed: number, alt: number): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80" viewBox="0 0 120 80">
-    <!-- Blimp label background -->
-    <rect x="4" y="0" width="112" height="26" rx="4" fill="rgba(0,20,30,0.85)" stroke="#00E5FF" stroke-width="1"/>
-    <text x="60" y="11" text-anchor="middle" fill="#00E5FF" font-family="monospace" font-size="9" font-weight="700">${phase}</text>
-    <text x="60" y="22" text-anchor="middle" fill="#88CCDD" font-family="monospace" font-size="8">${Math.round(speed)}kt  ${Math.round(alt)}m</text>
-    <!-- Connector line -->
-    <line x1="60" y1="26" x2="60" y2="40" stroke="#00E5FF" stroke-width="1" opacity="0.5"/>
-    <!-- Aircraft icon (delta wing LM shape) -->
-    <g transform="translate(60,58)">
-      <path d="M0,-16 L-4,-6 L-18,6 L-18,8 L-4,4 L-3,14 L-6,16 L-6,18 L0,16 L6,18 L6,16 L3,14 L4,4 L18,8 L18,6 L4,-6 Z" fill="#00E5FF" stroke="#003344" stroke-width="0.5"/>
-      <!-- Glow pulse -->
-      <circle r="4" fill="#00E5FF" opacity="0.3"/>
-    </g>
-  </svg>`
-}
 
 interface MapTrackerProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -56,32 +38,42 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
   const trailRef = useRef<{ lat: number; lng: number }[]>([])
   const initDoneRef = useRef(false)
   const lastCameraUpdate = useRef(0)
+  const [cameraLocked, setCameraLocked] = useState(true)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapplsGlobal = (window as any).mappls
+
+  // Unlock camera when user interacts with map
+  useEffect(() => {
+    if (!mapInstance) return
+    const unlock = () => setCameraLocked(false)
+    try {
+      mapInstance.on('dragstart', unlock)
+      mapInstance.on('zoomstart', unlock)
+      mapInstance.on('pitchstart', unlock)
+      mapInstance.on('rotatestart', unlock)
+    } catch { /* events may not exist */ }
+    return () => {
+      try {
+        mapInstance.off('dragstart', unlock)
+        mapInstance.off('zoomstart', unlock)
+        mapInstance.off('pitchstart', unlock)
+        mapInstance.off('rotatestart', unlock)
+      } catch { /* ignore */ }
+    }
+  }, [mapInstance])
 
   // Initialize map layers once
   useEffect(() => {
     if (!mapInstance || !mapplsGlobal || initDoneRef.current) return
     initDoneRef.current = true
 
-    // Set initial view: tilted 3D, zoomed to show start area
     try {
-      if (typeof mapInstance.setCenter === 'function') {
-        mapInstance.setCenter({ lat: ORIGIN.lat, lng: ORIGIN.lng })
-      }
-      if (typeof mapInstance.setZoom === 'function') {
-        mapInstance.setZoom(7)
-      }
-      if (typeof mapInstance.setPitch === 'function') {
-        mapInstance.setPitch(45)
-      }
-      if (typeof mapInstance.setBearing === 'function') {
-        mapInstance.setBearing(30)
-      }
-    } catch {
-      // Some methods may not exist
-    }
+      if (typeof mapInstance.setCenter === 'function') mapInstance.setCenter(ORIGIN)
+      if (typeof mapInstance.setZoom === 'function') mapInstance.setZoom(7)
+      if (typeof mapInstance.setPitch === 'function') mapInstance.setPitch(45)
+      if (typeof mapInstance.setBearing === 'function') mapInstance.setBearing(30)
+    } catch { /* ignore */ }
 
     // Projected route (dashed, dim)
     const planned = generatePlannedRoute()
@@ -94,9 +86,7 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
         strokeWeight: 2,
         dasharray: [8, 6],
       })
-    } catch {
-      // Polyline API may differ
-    }
+    } catch { /* ignore */ }
 
     // Origin marker
     try {
@@ -111,9 +101,7 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
           anchor: { x: 8, y: 8 },
         },
       })
-    } catch {
-      // Marker API may differ
-    }
+    } catch { /* ignore */ }
 
     // Target marker
     try {
@@ -128,24 +116,20 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
           anchor: { x: 10, y: 10 },
         },
       })
-    } catch {
-      // Marker API may differ
-    }
+    } catch { /* ignore */ }
 
-    // LM marker — large aircraft icon with info blimp label
+    // LM marker — use a simple HTML marker via Mappls
     try {
       markerRef.current = mapplsGlobal.Marker({
         map: mapInstance,
         position: ORIGIN,
         icon: {
-          url: 'data:image/svg+xml,' + encodeURIComponent(makeLmIcon('CRUISE', 0, 2000)),
-          scaledSize: { width: 120, height: 80 },
-          anchor: { x: 60, y: 65 },
+          url: 'data:image/svg+xml,' + encodeURIComponent(makeLmSvg(0)),
+          scaledSize: { width: 40, height: 40 },
+          anchor: { x: 20, y: 20 },
         },
       })
-    } catch {
-      // Marker API may differ
-    }
+    } catch { /* ignore */ }
 
     // Trail polyline (solid, bright)
     try {
@@ -156,9 +140,7 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
         strokeOpacity: 0.8,
         strokeWeight: 3,
       })
-    } catch {
-      // Polyline API may differ
-    }
+    } catch { /* ignore */ }
   }, [mapInstance, mapplsGlobal])
 
   // Live position updates
@@ -171,70 +153,158 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
       if (!lat || !lon) return
 
       const pos = { lat, lng: lon }
+      const heading = state.values.psi ?? 0
 
-      // Update LM marker position and icon
+      // Update LM marker position and heading rotation
       if (markerRef.current) {
-        try {
-          markerRef.current.setPosition(pos)
-        } catch { /* setPosition may not exist */ }
-
-        // Update icon with live telemetry
-        const phase = PHASE_LABELS[Math.round(state.values.flt_phase ?? 3)] ?? 'CRUISE'
-        const speed = state.values.gs ?? 0
-        const alt = state.values.alt_msl ?? 2000
+        try { markerRef.current.setPosition(pos) } catch { /* ignore */ }
         try {
           markerRef.current.setIcon({
-            url: 'data:image/svg+xml,' + encodeURIComponent(makeLmIcon(phase, speed, alt)),
-            scaledSize: { width: 120, height: 80 },
-            anchor: { x: 60, y: 65 },
+            url: 'data:image/svg+xml,' + encodeURIComponent(makeLmSvg(heading)),
+            scaledSize: { width: 40, height: 40 },
+            anchor: { x: 20, y: 20 },
           })
-        } catch { /* setIcon may not exist */ }
+        } catch { /* ignore */ }
       }
 
-      // Append to trail (throttle to avoid too many points)
+      // Append to trail
       const trail = trailRef.current
       if (trail.length === 0 ||
           Math.abs(lat - trail[trail.length - 1].lat) > 0.001 ||
           Math.abs(lon - trail[trail.length - 1].lng) > 0.001) {
         trail.push(pos)
-
-        // Update trail polyline
         if (trailPolyRef.current) {
-          try {
-            trailPolyRef.current.setPath(trail)
-          } catch {
-            // setPath may not exist, try removing and re-adding
-          }
+          try { trailPolyRef.current.setPath(trail) } catch { /* ignore */ }
         }
       }
 
-      // Camera chase — update every 2 seconds to avoid jitter
-      const now = Date.now()
-      if (now - lastCameraUpdate.current > 2000) {
-        lastCameraUpdate.current = now
-        try {
-          // Smooth camera: center on LM, tilted 3D view, bearing toward target
-          const bearing = state.values.psi ?? 0
-          if (typeof mapInstance.easeTo === 'function') {
-            mapInstance.easeTo({
-              center: pos,
-              bearing: bearing,
-              pitch: 50,
-              zoom: 9,
-              duration: 2000,
-            })
-          } else {
-            if (typeof mapInstance.setCenter === 'function') mapInstance.setCenter(pos)
-            if (typeof mapInstance.setBearing === 'function') mapInstance.setBearing(bearing)
-          }
-        } catch {
-          // Camera methods may not be available
+      // Camera chase (only when locked)
+      if (cameraLocked) {
+        const now = Date.now()
+        if (now - lastCameraUpdate.current > 2000) {
+          lastCameraUpdate.current = now
+          try {
+            if (typeof mapInstance.easeTo === 'function') {
+              mapInstance.easeTo({
+                center: pos,
+                bearing: heading,
+                pitch: 50,
+                zoom: 9,
+                duration: 2000,
+              })
+            } else {
+              if (typeof mapInstance.setCenter === 'function') mapInstance.setCenter(pos)
+              if (typeof mapInstance.setBearing === 'function') mapInstance.setBearing(heading)
+            }
+          } catch { /* ignore */ }
         }
       }
     })
 
     return unsub
-  }, [mapInstance, mapplsGlobal])
+  }, [mapInstance, mapplsGlobal, cameraLocked])
 
-  return null
+  // HTML overlay blimp (always visible, positioned via CSS)
+  const values = useTelemetryStore((s) => s.values)
+  const phase = PHASE_LABELS[Math.round(values.flt_phase ?? 3)] ?? 'CRUISE'
+  const speed = Math.round(values.gs ?? 0)
+  const alt = Math.round(values.alt_msl ?? 2000)
+  const distKm = Math.round((values.wpt_dist ?? 0) / 1000)
+
+  return (
+    <>
+      {/* Info blimp overlay — always visible at top of map */}
+      <div style={{
+        position: 'absolute',
+        top: 56,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 15,
+        pointerEvents: 'none',
+        display: 'flex',
+        gap: '8px',
+        padding: '6px 14px',
+        borderRadius: '8px',
+        backgroundColor: 'rgba(6, 10, 18, 0.88)',
+        backdropFilter: 'blur(8px)',
+        border: '1px solid rgba(0, 229, 255, 0.2)',
+      }}>
+        <BlimpItem label="PHASE" value={phase} color="#00E5FF" />
+        <BlimpSep />
+        <BlimpItem label="GS" value={`${speed} kt`} />
+        <BlimpSep />
+        <BlimpItem label="ALT" value={`${alt} m`} />
+        <BlimpSep />
+        <BlimpItem label="DTG" value={`${distKm} km`} />
+      </div>
+
+      {/* Camera lock button */}
+      <button
+        onClick={() => {
+          setCameraLocked(true)
+          // Immediately snap to LM
+          const lat = useTelemetryStore.getState().values.lat
+          const lon = useTelemetryStore.getState().values.lon
+          const hdg = useTelemetryStore.getState().values.psi ?? 0
+          if (lat && lon) {
+            try {
+              mapInstance.easeTo?.({
+                center: { lat, lng: lon },
+                bearing: hdg,
+                pitch: 50,
+                zoom: 9,
+                duration: 1000,
+              })
+            } catch { /* ignore */ }
+          }
+        }}
+        className="font-mono"
+        style={{
+          position: 'absolute',
+          bottom: 16,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 15,
+          pointerEvents: 'auto',
+          padding: '6px 16px',
+          borderRadius: '8px',
+          border: `1px solid ${cameraLocked ? 'rgba(0,229,255,0.3)' : 'rgba(255,255,255,0.15)'}`,
+          backgroundColor: cameraLocked ? 'rgba(0,229,255,0.1)' : 'rgba(10,14,26,0.9)',
+          color: cameraLocked ? '#00E5FF' : '#8899AA',
+          fontSize: '10px',
+          fontWeight: 600,
+          letterSpacing: '0.1em',
+          cursor: 'pointer',
+          textTransform: 'uppercase',
+          backdropFilter: 'blur(8px)',
+        }}
+      >
+        {cameraLocked ? '◉ LOCKED ON LM' : '○ LOCK ON LM'}
+      </button>
+    </>
+  )
+}
+
+function BlimpItem({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
+      <span className="font-mono" style={{ fontSize: '8px', color: '#5A6A82', letterSpacing: '0.08em' }}>{label}</span>
+      <span className="font-mono" style={{ fontSize: '11px', color: color ?? '#B0BFCC', fontWeight: 600 }}>{value}</span>
+    </div>
+  )
+}
+
+function BlimpSep() {
+  return <div style={{ width: '1px', height: '24px', backgroundColor: 'rgba(255,255,255,0.08)', alignSelf: 'center' }} />
+}
+
+// Simple LM aircraft SVG rotated to heading
+function makeLmSvg(heading: number): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+    <g transform="rotate(${heading}, 20, 20)">
+      <path d="M20,4 L16,14 L6,22 L6,24 L16,20 L17,32 L14,34 L14,36 L20,34 L26,36 L26,34 L23,32 L24,20 L34,24 L34,22 L24,14 Z" fill="#00E5FF" stroke="#001a22" stroke-width="1"/>
+      <circle cx="20" cy="20" r="2" fill="#ffffff" opacity="0.8"/>
+    </g>
+    <circle cx="20" cy="20" r="18" fill="none" stroke="#00E5FF" stroke-width="1" opacity="0.25"/>
+  </svg>`
 }
