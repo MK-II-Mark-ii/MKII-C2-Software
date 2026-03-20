@@ -29,17 +29,14 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
   const trailPolyRef = useRef<any>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const projectedPolyRef = useRef<any>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const originMarkerRef = useRef<any>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const targetMarkerRef = useRef<any>(null)
   const trailRef = useRef<{ lat: number; lng: number }[]>([])
   const initDoneRef = useRef(false)
   const lastCameraUpdate = useRef(0)
   const [cameraLocked, setCameraLocked] = useState(true)
 
-  // LM screen position for HTML overlay
+  // Screen positions for HTML overlays
   const [lmScreen, setLmScreen] = useState<{ x: number; y: number } | null>(null)
+  const [tgtScreen, setTgtScreen] = useState<{ x: number; y: number } | null>(null)
   const [lmHeading, setLmHeading] = useState(0)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -107,21 +104,6 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
       })
     } catch { /* ignore */ }
 
-    // Origin marker
-    try {
-      originMarkerRef.current = mapplsGlobal.Marker({
-        map: mapInstance,
-        position: ORIGIN,
-      })
-    } catch { /* ignore */ }
-
-    // Target marker
-    try {
-      targetMarkerRef.current = mapplsGlobal.Marker({
-        map: mapInstance,
-        position: TARGET,
-      })
-    } catch { /* ignore */ }
 
     // Trail polyline (solid, bright)
     try {
@@ -144,6 +126,9 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
       if (!lat || !lon) return
       const pt = projectToScreen(lat, lon)
       if (pt) setLmScreen(pt)
+      // Target crosshair
+      const tpt = projectToScreen(TARGET.lat, TARGET.lng)
+      if (tpt) setTgtScreen(tpt)
       // Update icon rotation when map bearing changes (2D/3D switch)
       const heading = vals.psi ?? 0
       let mapBearing = 0
@@ -182,9 +167,11 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
       try { mapBearing = mapInstance.getBearing?.() ?? 0 } catch { /* ignore */ }
       setLmHeading(heading - mapBearing)
 
-      // Project to screen for HTML overlay
+      // Project to screen for HTML overlays
       const pt = projectToScreen(lat, lon)
       if (pt) setLmScreen(pt)
+      const tpt = projectToScreen(TARGET.lat, TARGET.lng)
+      if (tpt) setTgtScreen(tpt)
 
       // Append to trail
       const trail = trailRef.current
@@ -226,6 +213,22 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
 
   return (
     <>
+      {/* Target crosshair */}
+      {tgtScreen && (
+        <div
+          style={{
+            position: 'absolute',
+            left: tgtScreen.x - 20,
+            top: tgtScreen.y - 20,
+            width: 40,
+            height: 40,
+            zIndex: 11,
+            pointerEvents: 'none',
+          }}
+          dangerouslySetInnerHTML={{ __html: TARGET_CROSSHAIR_SVG }}
+        />
+      )}
+
       {/* HTML aircraft icon overlay — positioned via screen projection */}
       {lmScreen && (
         <img
@@ -308,6 +311,16 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
     </>
   )
 }
+
+const TARGET_CROSSHAIR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+  <circle cx="20" cy="20" r="12" fill="none" stroke="#E24B4A" stroke-width="1.5" opacity="0.7"/>
+  <circle cx="20" cy="20" r="5" fill="none" stroke="#E24B4A" stroke-width="1.5" opacity="0.9"/>
+  <line x1="20" y1="2" x2="20" y2="14" stroke="#E24B4A" stroke-width="1.5"/>
+  <line x1="20" y1="26" x2="20" y2="38" stroke="#E24B4A" stroke-width="1.5"/>
+  <line x1="2" y1="20" x2="14" y2="20" stroke="#E24B4A" stroke-width="1.5"/>
+  <line x1="26" y1="20" x2="38" y2="20" stroke="#E24B4A" stroke-width="1.5"/>
+  <circle cx="20" cy="20" r="1.5" fill="#E24B4A"/>
+</svg>`
 
 function BlimpItem({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
