@@ -34,6 +34,7 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
   const initDoneRef = useRef(false)
   const lastCameraUpdate = useRef(0)
   const [cameraLocked, setCameraLocked] = useState(true)
+  const lockGuardRef = useRef(0) // timestamp when lock was engaged — ignore unlocks for 3s after
 
   // Screen positions for HTML overlays
   const [lmScreen, setLmScreen] = useState<{ x: number; y: number } | null>(null)
@@ -64,7 +65,11 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
   // Unlock camera when user interacts with map
   useEffect(() => {
     if (!mapInstance) return
-    const unlock = () => setCameraLocked(false)
+    const unlock = () => {
+      // Ignore unlocks within 3s of locking (easeTo triggers map events)
+      if (Date.now() - lockGuardRef.current < 3000) return
+      setCameraLocked(false)
+    }
     try {
       mapInstance.on('dragstart', unlock)
       mapInstance.on('zoomstart', unlock)
@@ -362,6 +367,7 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
       {/* Camera lock button */}
       <button
         onClick={() => {
+          lockGuardRef.current = Date.now()
           setCameraLocked(true)
           const lat = useTelemetryStore.getState().values.lat
           const lon = useTelemetryStore.getState().values.lon

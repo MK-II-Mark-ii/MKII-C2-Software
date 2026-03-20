@@ -173,13 +173,17 @@ export function generateTelemetryFrame(
       values.alt_agl = values.alt_msl - 200
     }
   } else if (phase === 6) {
-    // TERMINAL: steep dive, nose down -35 to -50°
-    values.theta = -40 + jitter(simTime, 0.15, 5)
-    values.vs = -20 + jitter(simTime, 0.2, 3)
-    if (prevValues) {
-      values.alt_msl = Math.max(0, (prevValues.alt_msl ?? 300) + dt * values.vs)
-      values.alt_agl = Math.max(0, values.alt_msl - 200)
-    }
+    // TERMINAL: steep dive — altitude decreases proportionally (exponential decay)
+    const prevAlt = prevValues?.alt_msl ?? 300
+    // Exponential decay: lose ~30% of remaining altitude per second of sim time
+    const decayRate = 0.3
+    const newAlt = prevAlt * Math.exp(-decayRate * dt)
+    values.alt_msl = Math.max(5, newAlt)
+    values.alt_agl = Math.max(0, values.alt_msl - 50)
+    values.vs = -(prevAlt - values.alt_msl) / (dt || 0.01)
+    // Pitch steepens as altitude drops
+    const pitchFactor = Math.min(1, (300 - values.alt_msl) / 300)
+    values.theta = -15 - 35 * Math.max(0, pitchFactor) + jitter(simTime, 0.15, 3)
   } else {
     // POST_MSN: impact
     values.theta = -60
