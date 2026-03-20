@@ -1,3 +1,4 @@
+import React from 'react'
 import { HUD_GREEN, HUD_GREEN_DIM, HUD_BG, HUD_AMBER, HUD_FONT, ALT_PX_PER_M, HUD_SHADOW_FILTER } from './hudConstants'
 
 interface Props {
@@ -15,7 +16,7 @@ export default function HudAltitudeTape({ altitude, vs }: Props) {
 
   const minAlt = Math.floor(altitude - visibleRange - 100)
   const maxAlt = Math.ceil(altitude + visibleRange + 100)
-  const ticks: JSX.Element[] = []
+  const ticks: React.ReactElement[] = []
 
   for (let m = Math.floor(minAlt / 50) * 50; m <= maxAlt; m += 50) {
     if (m < 0) continue

@@ -1,3 +1,4 @@
+import React from 'react'
 import { HUD_GREEN, HUD_GREEN_DIM, HUD_BG, HUD_FONT, IAS_PX_PER_KT, HUD_SHADOW_FILTER } from './hudConstants'
 
 interface Props {
@@ -14,7 +15,7 @@ export default function HudAirspeedTape({ ias, mach }: Props) {
 
   const minKt = Math.floor(ias - visibleRange - 10)
   const maxKt = Math.ceil(ias + visibleRange + 10)
-  const ticks: JSX.Element[] = []
+  const ticks: React.ReactElement[] = []
 
   for (let kt = minKt; kt <= maxKt; kt++) {
     if (kt < 0) continue

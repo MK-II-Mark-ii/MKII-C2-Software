@@ -102,7 +102,7 @@ export function generateTelemetryFrame(
 function generateParamValue(
   p: TelemetryParamDef,
   t: number,
-  prev: Record<string, number> | null,
+  _prev: Record<string, number> | null,
   _dt: number,
 ): number {
   const freq = JITTER_FREQS[p.id] ?? 0.2

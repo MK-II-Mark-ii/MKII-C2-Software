@@ -1,3 +1,4 @@
+import React from 'react'
 import { HUD_GREEN, HUD_GREEN_DIM, HUD_BG, HUD_FONT, HDG_PX_PER_DEG, HUD_SHADOW_FILTER } from './hudConstants'
 
 interface Props {
@@ -15,7 +16,7 @@ export default function HudHeadingTape({ heading }: Props) {
   const cx = W / 2
   const visibleDegs = cx / HDG_PX_PER_DEG
 
-  const ticks: JSX.Element[] = []
+  const ticks: React.ReactElement[] = []
   const minDeg = Math.floor(heading - visibleDegs - 10)
   const maxDeg = Math.ceil(heading + visibleDegs + 10)
 

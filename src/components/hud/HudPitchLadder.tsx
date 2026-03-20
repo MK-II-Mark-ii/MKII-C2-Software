@@ -1,3 +1,4 @@
+import React from 'react'
 import { HUD_GREEN, HUD_GREEN_DIM, HUD_FONT, PITCH_PX_PER_DEG, HUD_SHADOW_FILTER } from './hudConstants'
 
 interface Props {
@@ -13,7 +14,7 @@ export default function HudPitchLadder({ pitch, roll }: Props) {
   const pitchOffset = pitch * PITCH_PX_PER_DEG
 
   // Generate pitch lines from -30 to +30
-  const lines: JSX.Element[] = []
+  const lines: React.ReactElement[] = []
   for (let deg = -30; deg <= 30; deg += 5) {
     if (deg === 0) continue
     const isMajor = deg % 10 === 0

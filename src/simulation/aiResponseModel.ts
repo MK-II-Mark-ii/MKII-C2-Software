@@ -16,8 +16,6 @@ export function deriveResponseTargets(
   fusion: FusionState,
 ): Record<string, number> {
   const anyFault = faults.jamming || faults.spoofing
-  const gnssConf = techniques.GNSS.confidence_score
-  const spoofDelta = gnssConf // proxy — actual spoof_delta checked via technique spoofing_flag
   const spoofFlag = techniques.GNSS.spoofing_flag
   const composite = fusion.composite_confidence
 
