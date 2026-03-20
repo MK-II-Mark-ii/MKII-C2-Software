@@ -18,16 +18,23 @@ import type { ViewportMode } from '../../stores/uiStore'
 function CenterViewport() {
   const mode = useUIStore((s) => s.viewportMode)
 
-  if (mode === 'SPHERES') return <SphereViewport />
-  if (mode === 'MAP') return (
-    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <MapView />
-      <HudOverlay />
-    </div>
-  )
-  if (mode === 'TELEMETRY') return <TelemetryPage />
+  return (
+    <>
+      {/* Map is always mounted — hidden via CSS when not active, preserving state/position */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        visibility: mode === 'MAP' ? 'visible' : 'hidden',
+        zIndex: mode === 'MAP' ? 1 : 0,
+      }}>
+        <MapView />
+        {mode === 'MAP' && <HudOverlay />}
+      </div>
 
-  return <SphereViewport />
+      {/* Other views mount/unmount normally */}
+      {mode === 'SPHERES' && <SphereViewport />}
+      {mode === 'TELEMETRY' && <TelemetryPage />}
+    </>
+  )
 }
 
 function ViewportTabs() {

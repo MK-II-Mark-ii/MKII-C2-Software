@@ -35,16 +35,33 @@ export function generateTelemetryFrame(
     values[param.id] = generateParamValue(param, simTime, prevValues, dt)
   }
 
+  // --- Mission route: Jaisalmer AF Station → Muridke, Pakistan ---
+  const TGT_LAT = 31.802
+  const TGT_LON = 74.255
+  const curLat = prevValues?.lat ?? param('lat').nominalCruise
+  const curLon = prevValues?.lon ?? param('lon').nominalCruise
+
+  // Great-circle bearing to target
+  const dLon = (TGT_LON - curLon) * Math.PI / 180
+  const lat1 = curLat * Math.PI / 180
+  const lat2 = TGT_LAT * Math.PI / 180
+  const y = Math.sin(dLon) * Math.cos(lat2)
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon)
+  const bearing = ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360
+
+  // Set heading to steer toward target (with slight noise)
+  values.psi = (bearing + jitter(simTime, 0.05, 1.5) + 360) % 360
+
   // Cross-coupled parameters
-  values.tas = values.ias * (1 + values.alt_msl * 0.000035) // TAS increases with altitude
-  values.mach = values.tas * 0.514444 / 340.3 // rough Mach from TAS
+  values.tas = values.ias * (1 + values.alt_msl * 0.000035)
+  values.mach = values.tas * 0.514444 / 340.3
   values.alt_gps = values.alt_msl + jitter(simTime, 0.23, 3)
   values.palt = values.alt_msl + jitter(simTime, 0.19, 8)
   values.p_static = 1013.25 * Math.pow(1 - values.alt_msl * 0.0000226, 5.257)
   values.dalt = values.alt_msl + (values.oat - 15 + values.alt_msl * 0.0065) * 36
   values.gs = values.tas + values.wind_spd * Math.cos((values.wind_dir - values.psi) * Math.PI / 180)
-  values.trk = (values.psi + 2 * Math.sin(simTime * 0.03)) % 360
-  values.hdg_mag = (values.psi - 1.5 + 360) % 360 // declination offset
+  values.trk = (values.psi + jitter(simTime, 0.03, 2) + 360) % 360
+  values.hdg_mag = (values.psi - 1.5 + 360) % 360
 
   // Fuel depletes over time (roughly 3.2 kg/hr = 0.000889 kg/s)
   if (prevValues) {
@@ -79,13 +96,18 @@ export function generateTelemetryFrame(
     values.ttt = Math.max(0, (prevValues.ttt ?? param('ttt').nominalCruise) - dt)
   }
 
-  // Lat/lon change slowly (simulate west-bound cruise)
+  // Lat/lon update — fly toward Muridke target
   if (prevValues) {
     const gsMs = values.gs * 0.514444
     const trkRad = values.trk * Math.PI / 180
     values.lat = (prevValues.lat ?? param('lat').nominalCruise) + (gsMs * Math.cos(trkRad) * dt) / 111320
     values.lon = (prevValues.lon ?? param('lon').nominalCruise) + (gsMs * Math.sin(trkRad) * dt) / (111320 * Math.cos(values.lat * Math.PI / 180))
   }
+
+  // Target coordinates
+  values.tgt_lat = TGT_LAT
+  values.tgt_lon = TGT_LON
+  values.wpt_brg = bearing
 
   // Clamp all values to valid ranges
   for (const p of TELEMETRY_PARAMS) {

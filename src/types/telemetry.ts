@@ -59,7 +59,7 @@ export const TELEMETRY_PARAMS: TelemetryParamDef[] = [
   { id: 'vs', label: 'Vertical Speed', shortLabel: 'VS', unit: 'm/s', min: -30, max: 30, nominalCruise: 0, category: 'FLIGHT', format: 'float1' },
   { id: 'phi', label: 'Roll Angle', shortLabel: 'ROLL', unit: 'deg', min: -60, max: 60, nominalCruise: 0, category: 'FLIGHT', format: 'float1', warningHigh: 45, criticalHigh: 55 },
   { id: 'theta', label: 'Pitch Angle', shortLabel: 'PITCH', unit: 'deg', min: -30, max: 30, nominalCruise: -2, category: 'FLIGHT', format: 'float1' },
-  { id: 'psi', label: 'Heading', shortLabel: 'HDG', unit: 'deg', min: 0, max: 360, nominalCruise: 270, category: 'FLIGHT', format: 'int' },
+  { id: 'psi', label: 'Heading', shortLabel: 'HDG', unit: 'deg', min: 0, max: 360, nominalCruise: 36, category: 'FLIGHT', format: 'int' },
   { id: 'roll_rate', label: 'Roll Rate', shortLabel: 'P', unit: 'deg/s', min: -120, max: 120, nominalCruise: 0, category: 'FLIGHT', format: 'float1' },
   { id: 'pitch_rate', label: 'Pitch Rate', shortLabel: 'Q', unit: 'deg/s', min: -60, max: 60, nominalCruise: 0, category: 'FLIGHT', format: 'float1' },
   { id: 'g_load', label: 'Normal G-Load', shortLabel: 'Nz', unit: 'g', min: -1, max: 4, nominalCruise: 1.0, category: 'FLIGHT', format: 'float2', warningHigh: 3.0, criticalHigh: 3.5 },
@@ -77,11 +77,11 @@ export const TELEMETRY_PARAMS: TelemetryParamDef[] = [
   { id: 'prop_pitch', label: 'Prop Pitch', shortLabel: 'PPCH', unit: 'deg', min: 10, max: 45, nominalCruise: 28, category: 'PROPULSION', format: 'int' },
 
   // ── NAVIGATION (12) ──
-  { id: 'lat', label: 'Latitude', shortLabel: 'LAT', unit: 'deg', min: -90, max: 90, nominalCruise: 26.9124, category: 'NAVIGATION', format: 'float4' },
-  { id: 'lon', label: 'Longitude', shortLabel: 'LON', unit: 'deg', min: -180, max: 180, nominalCruise: 75.7873, category: 'NAVIGATION', format: 'float4' },
+  { id: 'lat', label: 'Latitude', shortLabel: 'LAT', unit: 'deg', min: -90, max: 90, nominalCruise: 26.8882, category: 'NAVIGATION', format: 'float4' },
+  { id: 'lon', label: 'Longitude', shortLabel: 'LON', unit: 'deg', min: -180, max: 180, nominalCruise: 70.9150, category: 'NAVIGATION', format: 'float4' },
   { id: 'alt_gps', label: 'GPS Altitude', shortLabel: 'GALT', unit: 'm', min: 0, max: 5000, nominalCruise: 2000, category: 'NAVIGATION', format: 'int' },
   { id: 'gs', label: 'Ground Speed', shortLabel: 'GS', unit: 'kt', min: 0, max: 220, nominalCruise: 98, category: 'NAVIGATION', format: 'int' },
-  { id: 'trk', label: 'Ground Track', shortLabel: 'TRK', unit: 'deg', min: 0, max: 360, nominalCruise: 272, category: 'NAVIGATION', format: 'int' },
+  { id: 'trk', label: 'Ground Track', shortLabel: 'TRK', unit: 'deg', min: 0, max: 360, nominalCruise: 36, category: 'NAVIGATION', format: 'int' },
   { id: 'hdg_mag', label: 'Magnetic Heading', shortLabel: 'MHDG', unit: 'deg', min: 0, max: 360, nominalCruise: 271, category: 'NAVIGATION', format: 'int' },
   { id: 'wind_spd', label: 'Wind Speed', shortLabel: 'WIND', unit: 'kt', min: 0, max: 60, nominalCruise: 12, category: 'NAVIGATION', format: 'int' },
   { id: 'wind_dir', label: 'Wind Direction', shortLabel: 'WDIR', unit: 'deg', min: 0, max: 360, nominalCruise: 315, category: 'NAVIGATION', format: 'int' },
@@ -93,7 +93,7 @@ export const TELEMETRY_PARAMS: TelemetryParamDef[] = [
   // ── GUIDANCE (10) ──
   { id: 'wpt_idx', label: 'Active Waypoint', shortLabel: 'WPT', unit: '', min: 0, max: 99, nominalCruise: 3, category: 'GUIDANCE', format: 'int' },
   { id: 'wpt_dist', label: 'Dist to Waypoint', shortLabel: 'WDST', unit: 'm', min: 0, max: 100000, nominalCruise: 15000, category: 'GUIDANCE', format: 'int' },
-  { id: 'wpt_brg', label: 'Bearing to Waypoint', shortLabel: 'WBRG', unit: 'deg', min: 0, max: 360, nominalCruise: 275, category: 'GUIDANCE', format: 'int' },
+  { id: 'wpt_brg', label: 'Bearing to Waypoint', shortLabel: 'WBRG', unit: 'deg', min: 0, max: 360, nominalCruise: 36, category: 'GUIDANCE', format: 'int' },
   { id: 'xte', label: 'Cross-Track Error', shortLabel: 'XTE', unit: 'm', min: -500, max: 500, nominalCruise: 0, category: 'GUIDANCE', format: 'float1', warningHigh: 200, warningLow: -200 },
   { id: 'ttw', label: 'Time to Waypoint', shortLabel: 'TTW', unit: 's', min: 0, max: 36000, nominalCruise: 300, category: 'GUIDANCE', format: 'int' },
   { id: 'ttt', label: 'Time to Target', shortLabel: 'TTT', unit: 's', min: 0, max: 36000, nominalCruise: 5400, category: 'GUIDANCE', format: 'int' },
@@ -120,8 +120,8 @@ export const TELEMETRY_PARAMS: TelemetryParamDef[] = [
   { id: 'trk_status', label: 'Tracker Status', shortLabel: 'TSTS', unit: '', min: 0, max: 4, nominalCruise: 0, category: 'PAYLOAD', format: 'enum', enumLabels: ['IDLE', 'ACQUIRING', 'TRACKING', 'COAST', 'LOST'] },
   { id: 'trk_conf', label: 'Tracker Confidence', shortLabel: 'TCNF', unit: '%', min: 0, max: 100, nominalCruise: 0, category: 'PAYLOAD', format: 'int' },
   { id: 'lrf_range', label: 'Laser Range', shortLabel: 'LRF', unit: 'm', min: 0, max: 10000, nominalCruise: 0, category: 'PAYLOAD', format: 'int' },
-  { id: 'tgt_lat', label: 'Target Latitude', shortLabel: 'TLAT', unit: 'deg', min: -90, max: 90, nominalCruise: 0, category: 'PAYLOAD', format: 'float4' },
-  { id: 'tgt_lon', label: 'Target Longitude', shortLabel: 'TLON', unit: 'deg', min: -180, max: 180, nominalCruise: 0, category: 'PAYLOAD', format: 'float4' },
+  { id: 'tgt_lat', label: 'Target Latitude', shortLabel: 'TLAT', unit: 'deg', min: -90, max: 90, nominalCruise: 31.802, category: 'PAYLOAD', format: 'float4' },
+  { id: 'tgt_lon', label: 'Target Longitude', shortLabel: 'TLON', unit: 'deg', min: -180, max: 180, nominalCruise: 74.255, category: 'PAYLOAD', format: 'float4' },
   { id: 'tgt_elev', label: 'Target Elevation', shortLabel: 'TELV', unit: 'm', min: -100, max: 5000, nominalCruise: 0, category: 'PAYLOAD', format: 'int' },
 
   // ── POWER SYSTEMS (8) ──

@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
+import MapTracker from './MapTracker'
 
 const MAPPLS_KEY = import.meta.env.VITE_MAPPLS_KEY || ''
 const SDK_URL = `https://apis.mappls.com/advancedmaps/api/${MAPPLS_KEY}/map_sdk?layer=vector&v=3.0`
@@ -30,7 +31,8 @@ function loadMapplsSDK(cb: () => void) {
 
 export default function MapView() {
   const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<unknown>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mapRef = useRef<any>(null)
   const [ready, setReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -47,31 +49,24 @@ export default function MapView() {
 
     try {
       const map = mapplsGlobal.Map('mappls-container', {
-        center: { lat: 22.5, lng: 78.9 },
-        zoom: 4,
+        center: { lat: 26.8882, lng: 70.9150 }, // Jaisalmer AF Station
+        zoom: 7,
         zoomControl: true,
         traffic: false,
       })
 
       mapRef.current = map
 
-      // Wait for map load, then find and apply a dark/night style
       const applyDarkStyle = () => {
         try {
           const styles = mapplsGlobal.getStyles?.()
           if (styles && Array.isArray(styles)) {
-            // Log available styles so we can see what's offered
-            console.log('Mappls available styles:', styles.map((s: { name: string; displayName: string }) => `${s.name} (${s.displayName})`))
-            // Try to find a night/dark style
             const dark = styles.find((s: { name: string }) =>
               /night|dark/i.test(s.name)
             )
             if (dark) {
               mapplsGlobal.setStyle(dark.name)
-              console.log('Applied dark style:', dark.name)
             } else {
-              console.log('No dark style found, trying known names...')
-              // Try known dark style names
               for (const name of ['standard-night', 'grey-night', 'night', 'dark']) {
                 try { mapplsGlobal.setStyle(name); break } catch { /* try next */ }
               }
@@ -85,7 +80,6 @@ export default function MapView() {
 
       if (map && typeof map.on === 'function') {
         map.on('load', applyDarkStyle)
-        // Fallback if load event doesn't fire
         setTimeout(() => { if (!ready) applyDarkStyle() }, 5000)
       } else {
         setTimeout(applyDarkStyle, 2000)
@@ -105,6 +99,19 @@ export default function MapView() {
     loadMapplsSDK(initMap)
   }, [initMap])
 
+  // Resize map when container size changes
+  useEffect(() => {
+    if (!containerRef.current || !mapRef.current) return
+    const map = mapRef.current as { resize?: () => void }
+    if (typeof map.resize !== 'function') return
+
+    const ro = new ResizeObserver(() => {
+      map.resize?.()
+    })
+    ro.observe(containerRef.current)
+    return () => ro.disconnect()
+  }, [ready])
+
   if (error) {
     return (
       <div style={{
@@ -117,19 +124,6 @@ export default function MapView() {
     )
   }
 
-  // Resize map when container size changes (e.g. panel collapse/expand)
-  useEffect(() => {
-    if (!containerRef.current || !mapRef.current) return
-    const map = mapRef.current as { resize?: () => void }
-    if (typeof map.resize !== 'function') return
-
-    const ro = new ResizeObserver(() => {
-      map.resize?.()
-    })
-    ro.observe(containerRef.current)
-    return () => ro.disconnect()
-  }, [ready]) // re-attach when map becomes ready
-
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div ref={containerRef} id="mappls-container" style={{ width: '100%', height: '100%' }} />
@@ -141,6 +135,8 @@ export default function MapView() {
           <span className="font-mono text-xs" style={{ color: '#5A6A82' }}>LOADING MAP...</span>
         </div>
       )}
+      {/* Live LM tracker — route, trail, camera chase */}
+      {ready && mapRef.current && <MapTracker mapInstance={mapRef.current} />}
     </div>
   )
 }
