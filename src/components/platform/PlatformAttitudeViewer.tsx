@@ -144,11 +144,7 @@ function PlatformModel() {
     clone.position.set(-center.x * scale, -center.y * scale, -center.z * scale)
     clone.scale.setScalar(scale)
 
-    // Align model: rotate so nose points along +Z (toward camera)
-    // Shahed 136 GLB: nose is along +Y in model space, rotate to +Z
-    clone.rotation.set(Math.PI / 2, Math.PI, 0)
-
-    // Visible light grey body
+    // Apply material
     clone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh
@@ -162,7 +158,12 @@ function PlatformModel() {
       }
     })
 
-    return clone
+    // Wrap in a pivot to orient nose toward +Z (compass North)
+    const pivot = new THREE.Group()
+    pivot.add(clone)
+    pivot.rotation.set(Math.PI / 2, Math.PI, 0)
+
+    return pivot
   }, [gltf])
 
   return (
