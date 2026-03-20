@@ -118,15 +118,15 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
       })
     } catch { /* ignore */ }
 
-    // LM marker — use a simple HTML marker via Mappls
+    // LM marker — top-view aircraft silhouette
     try {
       markerRef.current = mapplsGlobal.Marker({
         map: mapInstance,
         position: ORIGIN,
         icon: {
           url: 'data:image/svg+xml,' + encodeURIComponent(makeLmSvg(0)),
-          scaledSize: { width: 40, height: 40 },
-          anchor: { x: 20, y: 20 },
+          scaledSize: { width: 64, height: 64 },
+          anchor: { x: 32, y: 32 },
         },
       })
     } catch { /* ignore */ }
@@ -161,8 +161,8 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
         try {
           markerRef.current.setIcon({
             url: 'data:image/svg+xml,' + encodeURIComponent(makeLmSvg(heading)),
-            scaledSize: { width: 40, height: 40 },
-            anchor: { x: 20, y: 20 },
+            scaledSize: { width: 64, height: 64 },
+            anchor: { x: 32, y: 32 },
           })
         } catch { /* ignore */ }
       }
@@ -296,13 +296,23 @@ function BlimpSep() {
   return <div style={{ width: '1px', height: '24px', backgroundColor: 'rgba(255,255,255,0.08)', alignSelf: 'center' }} />
 }
 
-// Simple LM aircraft SVG rotated to heading
+// Top-view Shahed-136 silhouette — delta wing loitering munition
+// Rotated to match heading, dark fill with cyan accent (MIL-STD style)
 function makeLmSvg(heading: number): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
-    <g transform="rotate(${heading}, 20, 20)">
-      <path d="M20,4 L16,14 L6,22 L6,24 L16,20 L17,32 L14,34 L14,36 L20,34 L26,36 L26,34 L23,32 L24,20 L34,24 L34,22 L24,14 Z" fill="#00E5FF" stroke="#001a22" stroke-width="1"/>
-      <circle cx="20" cy="20" r="2" fill="#ffffff" opacity="0.8"/>
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+    <g transform="rotate(${heading}, 32, 32)">
+      <!-- Shadow for contrast on any map -->
+      <g opacity="0.4" transform="translate(1,1)">
+        <path d="M32,6 L29,18 L14,30 L14,33 L28,28 L27,48 L22,52 L22,55 L32,51 L42,55 L42,52 L37,48 L36,28 L50,33 L50,30 L35,18 Z" fill="#000"/>
+      </g>
+      <!-- Main body -->
+      <path d="M32,6 L29,18 L14,30 L14,33 L28,28 L27,48 L22,52 L22,55 L32,51 L42,55 L42,52 L37,48 L36,28 L50,33 L50,30 L35,18 Z" fill="#1a1a2e" stroke="#00E5FF" stroke-width="1.2"/>
+      <!-- Fuselage center line -->
+      <line x1="32" y1="8" x2="32" y2="50" stroke="#00E5FF" stroke-width="0.6" opacity="0.5"/>
+      <!-- Engine nacelle -->
+      <ellipse cx="32" cy="46" rx="3" ry="4" fill="#111" stroke="#00E5FF" stroke-width="0.5" opacity="0.7"/>
+      <!-- Nose dot -->
+      <circle cx="32" cy="10" r="1.5" fill="#00E5FF"/>
     </g>
-    <circle cx="20" cy="20" r="18" fill="none" stroke="#00E5FF" stroke-width="1" opacity="0.25"/>
   </svg>`
 }
