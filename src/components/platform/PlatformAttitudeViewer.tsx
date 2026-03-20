@@ -58,7 +58,7 @@ function CompassRing3D() {
   const cardinals: [number, string][] = [[0, 'N'], [90, 'E'], [180, 'S'], [270, 'W']]
 
   return (
-    <group ref={groupRef} position={[0, -0.7, 0]}>
+    <group ref={groupRef} position={[0, -0.9, 0]}>
       {/* Main ring */}
       <Line points={ringPoints} color={CYAN} lineWidth={1} transparent opacity={0.4} />
 
@@ -235,17 +235,14 @@ function ModelWithFallback() {
 function CameraSetup() {
   const { camera } = useThree()
   useEffect(() => {
-    camera.position.set(2.5, 1.8, 2.5)
-    camera.lookAt(0, -0.2, 0)
+    camera.position.set(3, 1.2, 3)
+    camera.lookAt(0, 0, 0)
   }, [camera])
   return null
 }
 
 // --- Main exported component ---
 export default function PlatformAttitudeViewer() {
-  const values = useTelemetryStore((s) => s.values)
-  const heading = values.psi ?? 270
-
   return (
     <div style={{
       display: 'flex',
@@ -263,7 +260,7 @@ export default function PlatformAttitudeViewer() {
         backgroundColor: '#060A12',
       }}>
         <Canvas
-          camera={{ position: [2.5, 1.8, 2.5], fov: 32, near: 0.1, far: 50 }}
+          camera={{ position: [3, 1.2, 3], fov: 32, near: 0.1, far: 50 }}
           gl={{ antialias: true, alpha: true }}
           style={{ background: 'transparent' }}
         >
@@ -287,25 +284,6 @@ export default function PlatformAttitudeViewer() {
         </Canvas>
       </div>
 
-      {/* Subtitle + heading readout */}
-      <div style={{ textAlign: 'center', padding: '4px 0 2px' }}>
-        <div className="font-mono" style={{
-          fontSize: '8px',
-          color: '#5A6A82',
-          letterSpacing: '0.05em',
-          fontStyle: 'italic',
-        }}>
-          Notional model — may not reflect actual aircraft type
-        </div>
-        <div className="font-mono" style={{
-          fontSize: '11px',
-          color: CYAN,
-          fontWeight: 600,
-          marginTop: '2px',
-        }}>
-          HDG {String(Math.round(((heading % 360) + 360) % 360)).padStart(3, '0')}°
-        </div>
-      </div>
     </div>
   )
 }
