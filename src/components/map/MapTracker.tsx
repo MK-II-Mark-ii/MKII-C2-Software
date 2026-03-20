@@ -222,7 +222,7 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
             top: tgtScreen.y - 20,
             width: 40,
             height: 40,
-            zIndex: 11,
+            zIndex: 5,
             pointerEvents: 'none',
           }}
           dangerouslySetInnerHTML={{ __html: TARGET_CROSSHAIR_SVG }}
@@ -240,7 +240,7 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
             top: lmScreen.y - 32,
             width: 64,
             height: 64,
-            zIndex: 12,
+            zIndex: 5,
             pointerEvents: 'none',
             transform: `rotate(${lmHeading}deg)`,
             transition: 'left 0.25s linear, top 0.25s linear, transform 0.25s linear',
