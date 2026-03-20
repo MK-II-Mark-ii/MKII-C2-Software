@@ -14,8 +14,18 @@ export default function TelemetrySparkline({ param, history, value, width, heigh
   const vw = width ?? 300
   const { pathD, color, formattedValue } = useMemo(() => {
     const data = history.length > 1 ? history : [value, value]
-    const min = param.min
-    const max = param.max
+
+    // Dynamic Y range from actual data with padding
+    let dataMin = data[0], dataMax = data[0]
+    for (const v of data) {
+      if (v < dataMin) dataMin = v
+      if (v > dataMax) dataMax = v
+    }
+    // Add 15% padding so the line doesn't touch edges
+    const dataRange = dataMax - dataMin || 1
+    const pad = dataRange * 0.15
+    const min = dataMin - pad
+    const max = dataMax + pad
     const range = max - min || 1
 
     const points = data.map((v, i) => {
