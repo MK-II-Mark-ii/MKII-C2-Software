@@ -59,9 +59,9 @@ function CompassRing3D() {
   const cardinals: [number, string][] = [[0, 'N'], [90, 'E'], [180, 'S'], [270, 'W']]
 
   return (
-    <group position={[0, -0.5, 0]}>
+    <group position={[0, -0.3, 0]}>
       {/* Fixed compass ring — N always at +Z (top of view) */}
-      <Line points={ringPoints} color={CYAN} lineWidth={1} transparent opacity={0.4} />
+      <Line points={ringPoints} color={CYAN} lineWidth={2.5} transparent opacity={0.5} />
 
       {/* Tick marks */}
       {tickLines.map((t, i) => (
@@ -69,9 +69,9 @@ function CompassRing3D() {
           key={i}
           points={t.points}
           color={CYAN}
-          lineWidth={1}
+          lineWidth={t.major ? 2.5 : 1.5}
           transparent
-          opacity={t.major ? 0.6 : 0.25}
+          opacity={t.major ? 0.7 : 0.35}
         />
       ))}
 
@@ -84,8 +84,9 @@ function CompassRing3D() {
             key={label}
             position={[Math.sin(rad) * labelR, 0.01, Math.cos(rad) * labelR]}
             rotation={[-Math.PI / 2, 0, 0]}
-            fontSize={0.15}
-            color={label === 'N' ? CYAN : '#6B7B8D'}
+            fontSize={0.22}
+            fontWeight={700}
+            color={label === 'N' ? CYAN : '#8899AA'}
             anchorX="center"
             anchorY="middle"
           >
