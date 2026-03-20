@@ -89,7 +89,8 @@ export function useSimulation() {
       navStore.batchUpdate(responseBatch)
 
       // 4. Update environment state
-      const envUpdates = deriveEnvironmentUpdates(navStore.environment, faults, dt)
+      const telValues = prevTelemetryValues.current
+      const envUpdates = deriveEnvironmentUpdates(navStore.environment, faults, dt, telValues)
       navStore.setEnvironment(envUpdates)
 
       // 5. Update mission state
@@ -97,6 +98,7 @@ export function useSimulation() {
       const missionUpdates = deriveMissionUpdates(
         navStore.mission, faults, dt, gnssConfidence,
         fusionState.composite_confidence, fusionState.active_technique_count,
+        simTime, telValues,
       )
       navStore.setMission(missionUpdates)
 

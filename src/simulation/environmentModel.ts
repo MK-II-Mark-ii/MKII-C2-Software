@@ -1,5 +1,4 @@
-import type { EnvironmentState, MissionState, DataLinkStatus } from '../types/navigation'
-import { defaultEnvironmentState, defaultMissionState } from '../types/navigation'
+import type { EnvironmentState, MissionState, MissionPhase, DataLinkStatus } from '../types/navigation'
 import type { FaultState } from './faultInjectionEngine'
 import { exponentialApproach } from './faultInjectionEngine'
 
@@ -39,7 +38,7 @@ function getEnvTargets(faults: FaultState): EnvTargets {
   if (faults.spoofing) {
     return {
       gnss_cn0_dbhz: 22,
-      gnss_satellite_count: 12, // spoofed sats still visible
+      gnss_satellite_count: 12,
       rf_noise_floor_dbm: -95,
       ew_threat_detected: true,
     }
@@ -51,20 +50,22 @@ const TAU_ENV_ONSET = 2.0
 const TAU_ENV_RECOVERY = 4.0
 
 /**
- * Derive environment state updates from fault conditions.
- * Uses exponential approach for smooth numeric transitions.
+ * Derive environment state from fault conditions + live telemetry.
  */
 export function deriveEnvironmentUpdates(
   currentEnv: EnvironmentState,
   faults: FaultState,
   dt: number,
+  telemetry?: Record<string, number> | null,
 ): Partial<EnvironmentState> {
   const targets = getEnvTargets(faults)
-  const defaults = defaultEnvironmentState()
 
   const tauCn0 = targets.gnss_cn0_dbhz < currentEnv.gnss_cn0_dbhz ? TAU_ENV_ONSET : TAU_ENV_RECOVERY
   const tauNoise = targets.rf_noise_floor_dbm > currentEnv.rf_noise_floor_dbm ? TAU_ENV_ONSET : TAU_ENV_RECOVERY
   const tauSat = targets.gnss_satellite_count < currentEnv.gnss_satellite_count ? TAU_ENV_ONSET : TAU_ENV_RECOVERY
+
+  // Pull live values from telemetry when available
+  const altAgl = telemetry?.alt_agl ?? 1500
 
   return {
     gnss_cn0_dbhz: exponentialApproach(currentEnv.gnss_cn0_dbhz, targets.gnss_cn0_dbhz, dt, tauCn0),
@@ -73,21 +74,32 @@ export function deriveEnvironmentUpdates(
     ),
     rf_noise_floor_dbm: exponentialApproach(currentEnv.rf_noise_floor_dbm, targets.rf_noise_floor_dbm, dt, tauNoise),
     ew_threat_detected: targets.ew_threat_detected,
-    // Other env vars stay at defaults
-    cloud_cover: defaults.cloud_cover,
-    visibility_km: defaults.visibility_km,
-    thermal_contrast: defaults.thermal_contrast,
-    terrain_roughness: defaults.terrain_roughness,
-    terrain_map_coverage: defaults.terrain_map_coverage,
-    magnetic_field_quality: defaults.magnetic_field_quality,
-    magnetic_map_loaded: defaults.magnetic_map_loaded,
-    eo_image_quality: defaults.eo_image_quality,
-    altitude_agl_m: defaults.altitude_agl_m,
+    cloud_cover: 0.10,
+    visibility_km: 15,
+    thermal_contrast: 0.70,
+    terrain_roughness: 0.60,
+    terrain_map_coverage: 0.90,
+    magnetic_field_quality: 0.75,
+    magnetic_map_loaded: true,
+    eo_image_quality: 0.85,
+    altitude_agl_m: altAgl,
   }
 }
 
+// ── Mission phase mapping from telemetry flt_phase ──
+const PHASE_MAP: Record<number, MissionPhase> = {
+  0: 'INIT',      // PRE_LCH
+  1: 'INIT',      // LAUNCH
+  2: 'CLIMB',     // CLIMB
+  3: 'TRANSIT',   // CRUISE
+  4: 'LOITER',    // LOITER
+  5: 'TERMINAL',  // INGRESS
+  6: 'TERMINAL',  // TERMINAL
+  7: 'BDA',       // POST_MSN
+}
+
 /**
- * Derive mission state updates from fault conditions and current state.
+ * Derive mission state from faults, confidence, and live telemetry.
  */
 export function deriveMissionUpdates(
   currentMission: MissionState,
@@ -96,39 +108,55 @@ export function deriveMissionUpdates(
   gnssConfidence: number,
   compositeConfidence: number,
   activeCount: number,
+  simTime?: number,
+  telemetry?: Record<string, number> | null,
 ): Partial<MissionState> {
-  const defaults = defaultMissionState()
-
-  // Accumulate GNSS denial time when confidence drops below threshold
+  // Accumulate GNSS denial time
   const timeInDenial = gnssConfidence < 0.35
     ? currentMission.time_in_denial_s + dt
-    : Math.max(0, currentMission.time_in_denial_s - dt * 0.5) // slow decay when recovering
+    : Math.max(0, currentMission.time_in_denial_s - dt * 0.5)
 
-  // Datalink status based on satcom confidence proxy
+  // Datalink status
   let datalinkStatus: DataLinkStatus = 'UP'
-  if (faults.jamming) {
-    // comms_satcom gets jammed — check via fault state directly
-    datalinkStatus = 'DEGRADED'
-  }
-  if (faults.jamming && faults.spoofing) {
-    datalinkStatus = 'DENIED'
-  }
+  if (faults.jamming) datalinkStatus = 'DEGRADED'
+  if (faults.jamming && faults.spoofing) datalinkStatus = 'DENIED'
 
-  // Abort condition: composite below floor AND insufficient techniques
+  // Abort condition
   const abortCondition = compositeConfidence < currentMission.mission_floor_confidence && activeCount <= 1
 
+  // Live mission phase from telemetry flt_phase
+  const fltPhase = Math.round(telemetry?.flt_phase ?? 3)
+  const missionPhase: MissionPhase = PHASE_MAP[fltPhase] ?? 'TRANSIT'
+
+  // Distance to target from telemetry (wpt_dist is in meters)
+  const distKm = (telemetry?.wpt_dist ?? 250000) / 1000
+
+  // CEP threshold varies by phase
+  let cep = 200
+  if (missionPhase === 'TERMINAL') cep = 15
+  else if (missionPhase === 'LOITER') cep = 50
+
+  // MITL auth: auto-authorize after climb phase
+  const time = simTime ?? 0
+  const mitlAuth = time > 40 ? 'AUTHORIZED' as const : 'PENDING' as const
+
+  // Waypoint index: rough progress indicator
+  const wptIndex = fltPhase <= 2 ? 0 : fltPhase <= 3 ? 1 : fltPhase <= 5 ? 2 : 3
+
+  // BDA sensor activates in terminal phase
+  const bdaSensor = fltPhase >= 6
+
   return {
+    mission_phase: missionPhase,
+    distance_to_target_km: Math.round(distKm * 10) / 10,
+    cep_threshold_m: cep,
     time_in_denial_s: timeInDenial,
+    mitl_auth_status: abortCondition ? 'ABORTED' : mitlAuth,
     datalink_status: datalinkStatus,
+    operator_override_active: false,
     abort_condition: abortCondition,
-    // Preserve other mission state
-    mission_phase: defaults.mission_phase,
-    distance_to_target_km: defaults.distance_to_target_km,
-    cep_threshold_m: defaults.cep_threshold_m,
-    mitl_auth_status: defaults.mitl_auth_status,
-    operator_override_active: defaults.operator_override_active,
-    mission_floor_confidence: defaults.mission_floor_confidence,
-    waypoint_index: defaults.waypoint_index,
-    bda_sensor_active: defaults.bda_sensor_active,
+    mission_floor_confidence: 0.40,
+    waypoint_index: wptIndex,
+    bda_sensor_active: bdaSensor,
   }
 }
