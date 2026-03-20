@@ -159,9 +159,11 @@ function PlatformModel() {
     })
 
     // Wrap in a pivot to orient nose toward +Z (compass North)
+    // GLB has nose pointing toward -Y, top toward +Z
+    // Rotate -90° around X to bring nose from -Y to +Z, then 180° around Z for correct top-up
     const pivot = new THREE.Group()
     pivot.add(clone)
-    pivot.rotation.set(Math.PI / 2, Math.PI, 0)
+    pivot.rotation.set(-Math.PI / 2, 0, Math.PI)
 
     return pivot
   }, [gltf])
