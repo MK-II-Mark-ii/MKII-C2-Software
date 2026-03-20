@@ -52,8 +52,10 @@ export function useSimulation() {
 
   useEffect(() => {
     const tick = (timestamp: number) => {
-      const dt = lastTimeRef.current ? Math.min((timestamp - lastTimeRef.current) / 1000, 0.1) : 0
+      const baseDt = lastTimeRef.current ? Math.min((timestamp - lastTimeRef.current) / 1000, 0.1) : 0
       lastTimeRef.current = timestamp
+      const simSpeed = useUIStore.getState().playbackSpeed
+      const dt = baseDt * simSpeed
       simTimeRef.current += dt
 
       const simTime = simTimeRef.current

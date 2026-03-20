@@ -18,6 +18,25 @@ function generatePlannedRoute(steps = 100): { lat: number; lng: number }[] {
   return pts
 }
 
+const PHASE_LABELS = ['PRE_LCH', 'LAUNCH', 'CLIMB', 'CRUISE', 'LOITER', 'INGRESS', 'TERMINAL', 'POST_MSN']
+
+function makeLmIcon(phase: string, speed: number, alt: number): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80" viewBox="0 0 120 80">
+    <!-- Blimp label background -->
+    <rect x="4" y="0" width="112" height="26" rx="4" fill="rgba(0,20,30,0.85)" stroke="#00E5FF" stroke-width="1"/>
+    <text x="60" y="11" text-anchor="middle" fill="#00E5FF" font-family="monospace" font-size="9" font-weight="700">${phase}</text>
+    <text x="60" y="22" text-anchor="middle" fill="#88CCDD" font-family="monospace" font-size="8">${Math.round(speed)}kt  ${Math.round(alt)}m</text>
+    <!-- Connector line -->
+    <line x1="60" y1="26" x2="60" y2="40" stroke="#00E5FF" stroke-width="1" opacity="0.5"/>
+    <!-- Aircraft icon (delta wing LM shape) -->
+    <g transform="translate(60,58)">
+      <path d="M0,-16 L-4,-6 L-18,6 L-18,8 L-4,4 L-3,14 L-6,16 L-6,18 L0,16 L6,18 L6,16 L3,14 L4,4 L18,8 L18,6 L4,-6 Z" fill="#00E5FF" stroke="#003344" stroke-width="0.5"/>
+      <!-- Glow pulse -->
+      <circle r="4" fill="#00E5FF" opacity="0.3"/>
+    </g>
+  </svg>`
+}
+
 interface MapTrackerProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   mapInstance: any
@@ -113,17 +132,15 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
       // Marker API may differ
     }
 
-    // LM marker (aircraft icon)
+    // LM marker — large aircraft icon with info blimp label
     try {
       markerRef.current = mapplsGlobal.Marker({
         map: mapInstance,
         position: ORIGIN,
         icon: {
-          url: 'data:image/svg+xml,' + encodeURIComponent(
-            `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M12 2L8 10H3l3 4-1 8 7-3 7 3-1-8 3-4h-5L12 2z" fill="#00E5FF" stroke="#003344" stroke-width="0.5"/></svg>`
-          ),
-          scaledSize: { width: 28, height: 28 },
-          anchor: { x: 14, y: 14 },
+          url: 'data:image/svg+xml,' + encodeURIComponent(makeLmIcon('CRUISE', 0, 2000)),
+          scaledSize: { width: 120, height: 80 },
+          anchor: { x: 60, y: 65 },
         },
       })
     } catch {
@@ -155,13 +172,23 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
 
       const pos = { lat, lng: lon }
 
-      // Update LM marker position
+      // Update LM marker position and icon
       if (markerRef.current) {
         try {
           markerRef.current.setPosition(pos)
-        } catch {
-          // setPosition may not exist
-        }
+        } catch { /* setPosition may not exist */ }
+
+        // Update icon with live telemetry
+        const phase = PHASE_LABELS[Math.round(state.values.flt_phase ?? 3)] ?? 'CRUISE'
+        const speed = state.values.gs ?? 0
+        const alt = state.values.alt_msl ?? 2000
+        try {
+          markerRef.current.setIcon({
+            url: 'data:image/svg+xml,' + encodeURIComponent(makeLmIcon(phase, speed, alt)),
+            scaledSize: { width: 120, height: 80 },
+            anchor: { x: 60, y: 65 },
+          })
+        } catch { /* setIcon may not exist */ }
       }
 
       // Append to trail (throttle to avoid too many points)

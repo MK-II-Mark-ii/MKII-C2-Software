@@ -109,6 +109,33 @@ export function generateTelemetryFrame(
   values.tgt_lon = TGT_LON
   values.wpt_brg = bearing
 
+  // --- Mission phase from distance-to-target ---
+  // Distance to target in km (approx haversine)
+  const dLatR = (TGT_LAT - values.lat) * Math.PI / 180
+  const dLonR = (TGT_LON - values.lon) * Math.PI / 180
+  const a = Math.sin(dLatR / 2) ** 2 + Math.cos(values.lat * Math.PI / 180) * Math.cos(TGT_LAT * Math.PI / 180) * Math.sin(dLonR / 2) ** 2
+  const distToTarget = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) // km
+
+  // Phase logic: PRE_LCH(0) LAUNCH(1) CLIMB(2) CRUISE(3) LOITER(4) INGRESS(5) TERMINAL(6) POST_MSN(7)
+  if (simTime < 5) {
+    values.flt_phase = 0 // PRE_LCH
+  } else if (simTime < 15) {
+    values.flt_phase = 1 // LAUNCH
+  } else if (simTime < 40) {
+    values.flt_phase = 2 // CLIMB
+  } else if (distToTarget > 50) {
+    values.flt_phase = 3 // CRUISE
+  } else if (distToTarget > 20) {
+    values.flt_phase = 5 // INGRESS
+  } else if (distToTarget > 2) {
+    values.flt_phase = 6 // TERMINAL
+  } else {
+    values.flt_phase = 7 // POST_MSN
+  }
+
+  // Update waypoint distance
+  values.wpt_dist = distToTarget * 1000 // meters
+
   // Clamp all values to valid ranges
   for (const p of TELEMETRY_PARAMS) {
     if (p.format === 'int' || p.format === 'enum' || p.format === 'bool') {
