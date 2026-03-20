@@ -133,6 +133,61 @@ export function generateTelemetryFrame(
   values.wpt_dist = distToTarget * 1000 // meters
   values.ttw = values.wpt_dist / (values.gs * 0.514444 + 0.01)
 
+  // --- Phase-dependent pitch, VS, and altitude behavior ---
+  const phase = values.flt_phase
+  if (phase <= 1) {
+    // PRE_LCH / LAUNCH: steep climb, nose up 25-35°
+    values.theta = 30 + jitter(simTime, 0.1, 3)
+    values.vs = 15 + jitter(simTime, 0.15, 2)
+    // Altitude ramps up from ground
+    if (prevValues) {
+      values.alt_msl = Math.min(2000, (prevValues.alt_msl ?? 0) + dt * values.vs)
+      values.alt_agl = values.alt_msl - 200 // terrain offset
+    } else {
+      values.alt_msl = 50
+      values.alt_agl = 50
+    }
+  } else if (phase === 2) {
+    // CLIMB: moderate climb, nose up 12-18°
+    values.theta = 15 + jitter(simTime, 0.12, 2)
+    values.vs = 8 + jitter(simTime, 0.1, 1.5)
+    if (prevValues) {
+      values.alt_msl = Math.min(2000, (prevValues.alt_msl ?? 500) + dt * values.vs)
+      values.alt_agl = values.alt_msl - 200
+    }
+  } else if (phase === 3 || phase === 4) {
+    // CRUISE / LOITER: level flight, slight nose down -2°
+    values.theta = -2 + jitter(simTime, 0.08, 0.8)
+    values.vs = jitter(simTime, 0.05, 0.5)
+    // Hold cruise altitude
+    if (prevValues) {
+      values.alt_msl = 2000 + jitter(simTime, 0.02, 15)
+      values.alt_agl = values.alt_msl - 200
+    }
+  } else if (phase === 5) {
+    // INGRESS: slight descent, nose down -8°
+    values.theta = -8 + jitter(simTime, 0.1, 1.5)
+    values.vs = -4 + jitter(simTime, 0.1, 1)
+    if (prevValues) {
+      values.alt_msl = Math.max(300, (prevValues.alt_msl ?? 2000) + dt * values.vs)
+      values.alt_agl = values.alt_msl - 200
+    }
+  } else if (phase === 6) {
+    // TERMINAL: steep dive, nose down -35 to -50°
+    values.theta = -40 + jitter(simTime, 0.15, 5)
+    values.vs = -20 + jitter(simTime, 0.2, 3)
+    if (prevValues) {
+      values.alt_msl = Math.max(0, (prevValues.alt_msl ?? 300) + dt * values.vs)
+      values.alt_agl = Math.max(0, values.alt_msl - 200)
+    }
+  } else {
+    // POST_MSN: impact
+    values.theta = -60
+    values.vs = -30
+    values.alt_msl = 0
+    values.alt_agl = 0
+  }
+
   // Clamp all values to valid ranges
   for (const p of TELEMETRY_PARAMS) {
     if (p.format === 'int' || p.format === 'enum' || p.format === 'bool') {
