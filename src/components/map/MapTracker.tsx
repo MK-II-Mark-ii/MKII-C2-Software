@@ -220,7 +220,9 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
     <>
       {/* HTML aircraft icon overlay — positioned via screen projection */}
       {lmScreen && (
-        <div
+        <img
+          src={`${import.meta.env.BASE_URL}lm-icon.svg`}
+          alt="LM"
           style={{
             position: 'absolute',
             left: lmScreen.x - 32,
@@ -232,7 +234,6 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
             transform: `rotate(${lmHeading}deg)`,
             transition: 'left 0.25s linear, top 0.25s linear, transform 0.25s linear',
           }}
-          dangerouslySetInnerHTML={{ __html: LM_TOP_VIEW_SVG }}
         />
       )}
 
@@ -312,22 +313,3 @@ function BlimpItem({ label, value, color }: { label: string; value: string; colo
 function BlimpSep() {
   return <div style={{ width: '1px', height: '24px', backgroundColor: 'rgba(255,255,255,0.08)', alignSelf: 'center' }} />
 }
-
-// Static SVG string — Shahed-136 top-view silhouette
-const LM_TOP_VIEW_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-  <!-- Shadow -->
-  <g opacity="0.5" transform="translate(1.5,1.5)">
-    <path d="M32,6 L29,18 L14,30 L14,33 L28,28 L27,48 L22,52 L22,55 L32,51 L42,55 L42,52 L37,48 L36,28 L50,33 L50,30 L35,18 Z" fill="#000"/>
-  </g>
-  <!-- Body -->
-  <path d="M32,6 L29,18 L14,30 L14,33 L28,28 L27,48 L22,52 L22,55 L32,51 L42,55 L42,52 L37,48 L36,28 L50,33 L50,30 L35,18 Z" fill="#1a1a2e" stroke="#00E5FF" stroke-width="1.5"/>
-  <!-- Center line -->
-  <line x1="32" y1="8" x2="32" y2="50" stroke="#00E5FF" stroke-width="0.7" opacity="0.4"/>
-  <!-- Engine -->
-  <ellipse cx="32" cy="46" rx="3" ry="4" fill="#111" stroke="#00E5FF" stroke-width="0.6" opacity="0.6"/>
-  <!-- Nose -->
-  <circle cx="32" cy="9" r="2" fill="#00E5FF"/>
-  <!-- Wing tips glow -->
-  <circle cx="14" cy="31" r="2" fill="#00E5FF" opacity="0.3"/>
-  <circle cx="50" cy="31" r="2" fill="#00E5FF" opacity="0.3"/>
-</svg>`
