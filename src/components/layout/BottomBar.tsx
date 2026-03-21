@@ -3,13 +3,16 @@ import MissionClock from '../telemetry/MissionClock'
 import { useFaultStore } from '../../stores/faultStore'
 import { useUIStore } from '../../stores/uiStore'
 
-const SPEEDS = [1, 2, 5, 10, 20, 50]
+const SPEEDS = [1, 10, 25, 100]
 
 export default function BottomBar() {
   const jamming = useFaultStore((s) => s.jamming)
   const spoofing = useFaultStore((s) => s.spoofing)
   const speed = useUIStore((s) => s.playbackSpeed)
   const setSpeed = useUIStore((s) => s.setPlaybackSpeed)
+  const missionComplete = useUIStore((s) => s.missionComplete)
+  const missionFlow = useUIStore((s) => s.missionFlow)
+  const isLanded = missionFlow === 'LANDED'
 
   return (
     <div
@@ -53,6 +56,64 @@ export default function BottomBar() {
             </span>
           )}
         </div>
+
+        {/* Center: Mission result banner */}
+        {missionComplete && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '10px',
+            padding: '4px 16px', borderRadius: '6px',
+            backgroundColor: 'rgba(0, 229, 255, 0.08)',
+            border: '1px solid rgba(0, 229, 255, 0.3)',
+          }}>
+            <span style={{ color: '#00E5FF', fontSize: '14px' }}>✓</span>
+            <span className="font-mono" style={{ fontSize: '11px', fontWeight: 700, color: '#00E5FF', letterSpacing: '0.1em' }}>
+              CONTACT SUCCESSFUL
+            </span>
+            <span className="font-mono" style={{ fontSize: '9px', color: '#8899AA' }}>
+              BDA Active
+            </span>
+            <button
+              onClick={() => window.location.reload()}
+              className="font-mono"
+              style={{
+                padding: '2px 10px', borderRadius: '4px',
+                border: '1px solid rgba(0, 229, 255, 0.3)',
+                backgroundColor: 'rgba(0, 229, 255, 0.1)',
+                color: '#00E5FF', fontSize: '9px', fontWeight: 600,
+                cursor: 'pointer', letterSpacing: '0.08em',
+              }}
+            >
+              RESET
+            </button>
+          </div>
+        )}
+
+        {isLanded && !missionComplete && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '10px',
+            padding: '4px 16px', borderRadius: '6px',
+            backgroundColor: 'rgba(0, 255, 136, 0.08)',
+            border: '1px solid rgba(0, 255, 136, 0.3)',
+          }}>
+            <span style={{ color: '#00FF88', fontSize: '14px' }}>✓</span>
+            <span className="font-mono" style={{ fontSize: '11px', fontWeight: 700, color: '#00FF88', letterSpacing: '0.1em' }}>
+              SAFELY RETURNED & CAPTURED
+            </span>
+            <button
+              onClick={() => window.location.reload()}
+              className="font-mono"
+              style={{
+                padding: '2px 10px', borderRadius: '4px',
+                border: '1px solid rgba(0, 255, 136, 0.3)',
+                backgroundColor: 'rgba(0, 255, 136, 0.1)',
+                color: '#00FF88', fontSize: '9px', fontWeight: 600,
+                cursor: 'pointer', letterSpacing: '0.08em',
+              }}
+            >
+              RESET
+            </button>
+          </div>
+        )}
 
         {/* Right: Mission clock + speed controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

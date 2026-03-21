@@ -29,14 +29,9 @@ export default function RightPanel() {
           onClick={toggleRight}
           title="Collapse panel (])"
           style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: '4px',
-            borderRadius: '4px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: '4px', borderRadius: '4px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
           <PanelRightClose size={14} color="#5A6A82" />

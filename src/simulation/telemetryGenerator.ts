@@ -18,13 +18,43 @@ for (const p of TELEMETRY_PARAMS) {
   DRIFT_FREQS[p.id] = 0.003 + seed * 0.015
 }
 
-import type { MissionFlowState } from '../stores/uiStore'
+import type { MissionFlowState, EngagementConfig } from '../stores/uiStore'
 
 // ── Constants ──
+// ── Launch site ──
 const ORIGIN_LAT = 26.9167
 const ORIGIN_LON = 70.9000
-const KT_TO_MS = 0.514444
-const G = 9.81
+
+// ── Physical constants ──
+const KT_TO_MS = 0.514444          // knots → m/s
+const G = 9.81                      // gravitational acceleration m/s²
+const EARTH_RADIUS_KM = 6371
+const DEG_PER_KM = 1 / 111.32      // approx degrees latitude per km
+
+// ── Flight envelope (Shahed-136 class LM) ──
+const MAX_BANK_DEG = 20             // max coordinated bank angle
+const CRUISE_ALT_M = 2000           // standard cruise altitude
+const CRUISE_IAS_KT = 95            // cruise indicated airspeed
+const TERRAIN_ELEV_M = 220          // average terrain elevation in AO
+const FUEL_CAPACITY_KG = 18         // full fuel load
+
+// ── Loiter parameters ──
+const LOITER_RADIUS_KM = 2.5        // orbit radius around target
+const LOITER_LEAD_ANGLE_DEG = 20    // pursuit-point lead angle on orbit
+const LOITER_IAS_KT = 90            // reduced speed for loiter efficiency
+
+// ── Engagement parameters ──
+const ENGAGE_IP_BUFFER_M = 1000     // extra horizontal distance beyond geometric dive start
+const ENGAGE_HEADING_TOL_DEG = 10   // heading alignment tolerance for inbound commit
+const ENGAGE_IP_ARRIVAL_KM = 0.8    // within this distance of IP = arrived
+const RTH_LANDING_DIST_KM = 2       // distance from origin to trigger landing
+const IMPACT_ALT_M = 5              // altitude threshold for impact detection
+
+// ── Phase timing (sim seconds) ──
+const PHASE_PRELAUNCH_END_S = 3
+const PHASE_LAUNCH_END_S = 12
+const PHASE_CLIMB_END_S = 45
+const LOITER_ENTRY_DIST_KM = 5      // auto-enter loiter within this distance
 
 /**
  * Generate physically-coupled telemetry with fault awareness.
@@ -40,6 +70,7 @@ export function generateTelemetryFrame(
   missionFlow?: MissionFlowState,
   targetLat?: number,
   targetLon?: number,
+  engageCfg?: EngagementConfig,
 ): Record<string, number> {
   const TGT_LAT = targetLat ?? 24.8359
   const TGT_LON = targetLon ?? 66.9832
@@ -56,7 +87,7 @@ export function generateTelemetryFrame(
   }
 
   // If mission already completed (POST_MSN), freeze all telemetry at impact state
-  if (prevValues && Math.round(prevValues.flt_phase ?? 0) === 7 && flow === 'LAUNCHED') {
+  if (prevValues && Math.round(prevValues.flt_phase ?? 0) === 7 && (flow === 'LAUNCHED' || flow === 'TERMINAL' || flow === 'ENGAGING')) {
     const frozen = { ...prevValues }
     frozen.flt_phase = 7
     frozen.alt_msl = 0
@@ -73,7 +104,7 @@ export function generateTelemetryFrame(
     frozen.fuel_flow = 0
     frozen.arm_status = 3 // FUZE_EN
     frozen.fuze_mode = 1  // CONTACT
-    frozen.theta = -70
+    frozen.theta = prevValues.theta ?? -(engageCfg?.diveAngle ?? 45)
     frozen.phi = 0
     frozen.roll_rate = 0
     frozen.pitch_rate = 0
@@ -83,8 +114,8 @@ export function generateTelemetryFrame(
     frozen.vib_z = 0
     frozen.gen_v = 0
     frozen.wpt_dist = 0
-    frozen.term_vel = 180
-    frozen.imp_angle = 70
+    frozen.term_vel = Math.round((engageCfg?.terminalSpeed ?? 150) * KT_TO_MS)
+    frozen.imp_angle = Math.round(Math.abs(prevValues.theta ?? 70))
     return frozen
   }
 
@@ -132,24 +163,27 @@ export function generateTelemetryFrame(
   const distToTarget = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 
   // RTH landing check — within 2km of origin
-  if (isRTH && distToTarget < 2) {
+  if (isRTH && distToTarget < RTH_LANDING_DIST_KM) {
     values._landed = 1
     return generateLandedTelemetry(prevValues)
   }
 
   // ════════════════════════════════════════════════
-  // 2. FLIGHT PHASE
+  // 2. FLIGHT PHASE — driven by missionFlow state machine
   // ════════════════════════════════════════════════
   let phase: number
   if (isRTH) {
     phase = 3 // CRUISE (returning home)
-  } else if (simTime < 3) phase = 0
-  else if (simTime < 12) phase = 1
-  else if (simTime < 45) phase = 2
-  else if (distToTarget > 50) phase = 3
-  else if (distToTarget > 15) phase = 5
-  else if (distToTarget > 1.5) phase = 6
-  else phase = 7
+  } else if (flow === 'LOITERING') {
+    phase = 4 // LOITER — orbiting target
+  } else if (flow === 'ENGAGING') {
+    phase = 5 // INGRESS — positioning for attack
+  } else if (flow === 'TERMINAL') {
+    phase = 6 // TERMINAL — diving
+  } else if (simTime < PHASE_PRELAUNCH_END_S) phase = 0
+  else if (simTime < PHASE_LAUNCH_END_S) phase = 1
+  else if (simTime < PHASE_CLIMB_END_S) phase = 2
+  else phase = 3 // CRUISE until loiter is triggered by proximity check in useSimulation
   values.flt_phase = phase
 
   // ════════════════════════════════════════════════
@@ -168,61 +202,178 @@ export function generateTelemetryFrame(
     targetIas = 70 + jitter(simTime, 0.08, 3)
     values.vs = 12 + jitter(simTime, 0.15, 2)
     values.alt_msl = prevValues ? Math.min(2000, prevAlt + dt * values.vs) : 50
-    values.alt_agl = Math.max(0, values.alt_msl - 220)
+    values.alt_agl = Math.max(0, values.alt_msl - TERRAIN_ELEV_M)
   } else if (phase === 2) {
     targetThrottle = 82 + jitter(simTime, 0.08, 2)
     targetPitch = 12 + jitter(simTime, 0.1, 2)
     targetIas = 85 + jitter(simTime, 0.06, 2)
     values.vs = 6 + jitter(simTime, 0.1, 1.5)
     values.alt_msl = prevValues ? Math.min(2000, prevAlt + dt * values.vs) : 800
-    values.alt_agl = Math.max(0, values.alt_msl - 220)
-  } else if (phase === 3 || phase === 4) {
+    values.alt_agl = Math.max(0, values.alt_msl - TERRAIN_ELEV_M)
+  } else if (phase === 3) {
+    // CRUISE: level flight toward target
     targetThrottle = 55 + jitter(simTime, 0.05, 2)
     targetPitch = -2 + jitter(simTime, 0.08, 0.6)
     targetIas = 95 + jitter(simTime, 0.04, 2)
     values.vs = jitter(simTime, 0.05, 0.4)
     values.alt_msl = 2000 + jitter(simTime, 0.02, 12)
-    values.alt_agl = values.alt_msl - 220
+    values.alt_agl = Math.max(0, values.alt_msl - TERRAIN_ELEV_M)
 
-    // JAMMING: autopilot hunting from degraded nav
     if (jamDenial > 0.5) {
       values.alt_msl += jitter(simTime, 0.08, 25 * jamDenial)
       values.vs += jitter(simTime, 0.12, 2 * jamDenial)
       targetPitch += jitter(simTime, 0.1, 1.5 * jamDenial)
     }
-
-    // SPOOFING (detected): brief transient as autopilot switches to INS+TERCOM
     if (spoofDetected && prevValues) {
       const timeSinceDetect = simTime - (prevValues._spoofDetectTime ?? simTime)
       if (timeSinceDetect < 5) {
-        // Transient: pitch wobble + altitude dip during mode switch
         const transientFade = Math.exp(-timeSinceDetect * 0.5)
         targetPitch += 3 * Math.sin(timeSinceDetect * 2) * transientFade
         values.alt_msl += -15 * transientFade
         values.vs += -2 * transientFade
       }
     }
+  } else if (phase === 4) {
+    // LOITER: circular orbit around target at 2.5km radius
+    // Method: pursuit-point — compute a point on the ideal circle ~20° ahead
+    // of the LM's current angular position, then steer toward it
+    const LOITER_RADIUS_DEG = LOITER_RADIUS_KM * DEG_PER_KM
+
+    // Angle from target center to current LM position
+    const dLatT = curLat - TGT_LAT
+    const dLonT = (curLon - TGT_LON) * Math.cos(TGT_LAT * Math.PI / 180)
+    const currentAngle = Math.atan2(dLonT, dLatT) // radians from N
+
+    // Pursuit point: 20° ahead on the circle (clockwise = right-hand orbit)
+    const leadAngle = currentAngle + (LOITER_LEAD_ANGLE_DEG * Math.PI / 180)
+    const pursuitLat = TGT_LAT + LOITER_RADIUS_DEG * Math.cos(leadAngle)
+    const pursuitLon = TGT_LON + (LOITER_RADIUS_DEG / Math.cos(TGT_LAT * Math.PI / 180)) * Math.sin(leadAngle)
+
+    // Bearing from current position to pursuit point
+    const pDLon = (pursuitLon - curLon) * Math.PI / 180
+    const pLat2 = pursuitLat * Math.PI / 180
+    const pY = Math.sin(pDLon) * Math.cos(pLat2)
+    const pX = Math.cos(lat1) * Math.sin(pLat2) - Math.sin(lat1) * Math.cos(pLat2) * Math.cos(pDLon)
+    values._loiterBearing = ((Math.atan2(pY, pX) * 180 / Math.PI) + 360) % 360
+
+    // Maintain orbit altitude at configured engagement altitude
+    const engAlt = engageCfg?.engageAltitude ?? 2000
+    targetThrottle = 55 + jitter(simTime, 0.05, 2)
+    targetPitch = -1 + jitter(simTime, 0.06, 0.4)
+    targetIas = 90 + jitter(simTime, 0.04, 2)
+    values.vs = jitter(simTime, 0.04, 0.3)
+    if (prevValues) {
+      const altError = engAlt - prevAlt
+      values.alt_msl = prevAlt + clamp(altError * 0.1, -3, 3) * dt + jitter(simTime, 0.02, 5)
+    } else {
+      values.alt_msl = engAlt
+    }
+    values.alt_agl = Math.max(0, values.alt_msl - TERRAIN_ELEV_M)
   } else if (phase === 5) {
-    targetThrottle = 70 + jitter(simTime, 0.08, 2)
-    targetPitch = -6 + jitter(simTime, 0.1, 1)
-    targetIas = 110 + jitter(simTime, 0.06, 3)
-    values.vs = -5 + jitter(simTime, 0.1, 1)
-    values.alt_msl = prevValues ? Math.max(250, prevAlt + dt * values.vs) : 1200
-    values.alt_agl = Math.max(0, values.alt_msl - 100)
+    // ═══════════════════════════════════════════════════════════
+    // ENGAGING — Inbound attack run
+    //
+    // The LM has already been positioned by the LOITERING phase.
+    // When ENGAGE was pressed, useSimulation kept the LM in LOITERING
+    // until it reached the correct angular position on the orbit
+    // (opposite the attack bearing). Then it transitioned to ENGAGING.
+    //
+    // At this point the LM just needs to:
+    //   1. Fly on the attack bearing toward the target
+    //   2. Maintain engagement altitude
+    //   3. When at dive start distance → ready for terminal
+    // ═══════════════════════════════════════════════════════════
+    const engAlt = engageCfg?.engageAltitude ?? 1500
+    const attackBrg = engageCfg?.attackBearing ?? 0
+    const diveAngle = engageCfg?.diveAngle ?? 45
+    const diveAngleRad = diveAngle * Math.PI / 180
+
+    // Geometric dive start distance including VS ramp overshoot
+    const diveStartDistM = engAlt / Math.tan(diveAngleRad)
+    const termSpeedMs = (engageCfg?.terminalSpeed ?? 150) * KT_TO_MS
+    const rampTime = (termSpeedMs * Math.sin(diveAngleRad)) / 8
+    const rampOvershootM = termSpeedMs * Math.cos(diveAngleRad) * rampTime * 0.5
+    const diveStartDistKm = (diveStartDistM + rampOvershootM) / 1000
+
+    // Inbound heading: attack FROM attackBrg means fly TOWARD target on (attackBrg + 180°)
+    // e.g. attack from N (0°) → fly south (180°) toward target
+    const inboundHeading = (attackBrg + 180) % 360
+    values._engageBearing = inboundHeading
+
+    // Heading alignment check
+    const curHeading = prevValues?.psi ?? inboundHeading
+    let alignError = inboundHeading - curHeading
+    if (alignError > 180) alignError -= 360
+    if (alignError < -180) alignError += 360
+
+    // Ready for terminal at geometric dive start point
+    if (distToTarget <= diveStartDistKm && Math.abs(alignError) < ENGAGE_HEADING_TOL_DEG) {
+      values._readyForTerminal = 1
+    }
+
+    // Flight dynamics for inbound run
+    targetThrottle = 75 + jitter(simTime, 0.06, 2)
+    targetPitch = -2 + jitter(simTime, 0.08, 0.4)
+    targetIas = 110 + jitter(simTime, 0.04, 2)
+
+    // Maintain engagement altitude
+    if (prevValues) {
+      const altErr = engAlt - prevAlt
+      values.alt_msl = prevAlt + clamp(altErr * 0.12, -4, 4) * dt
+    } else {
+      values.alt_msl = engAlt
+    }
+    values.vs = prevValues ? (values.alt_msl - prevAlt) / (dt || 0.01) : 0
+    values.alt_agl = Math.max(0, values.alt_msl - TERRAIN_ELEV_M)
   } else if (phase === 6) {
-    const prevTermAlt = prevValues?.alt_msl ?? 250
-    const decayRate = 0.25
-    const newAlt = prevTermAlt * Math.exp(-decayRate * dt)
-    values.alt_msl = Math.max(3, newAlt)
-    values.alt_agl = Math.max(0, values.alt_msl - 30)
-    values.vs = -(prevTermAlt - values.alt_msl) / (dt || 0.01)
-    const altFrac = Math.min(1, Math.max(0, (250 - values.alt_msl) / 250))
-    targetThrottle = 100
-    targetPitch = -20 - 50 * altFrac + jitter(simTime, 0.15, 2)
-    targetIas = 130 + 80 * altFrac + jitter(simTime, 0.1, 3)
+    // ═══════════════════════════════════════════════════════════
+    // TERMINAL DIVE — constant flight-path-angle dive
+    //
+    // Physics:
+    //   Flight path angle: γ (configured diveAngle)
+    //   Horizontal speed: V_h = V * cos(γ)
+    //   Vertical speed:   V_v = -V * sin(γ)
+    //   Pitch angle:      θ = -γ
+    //
+    //   Time to impact from h₀: t = h₀ / (V * sin(γ))
+    //   e.g. γ=45°, h₀=1500m, V=77m/s → t=27.5s
+    // ═══════════════════════════════════════════════════════════
+    const cfgDiveAngle = engageCfg?.diveAngle ?? 45
+    const cfgTermSpeedKt = engageCfg?.terminalSpeed ?? 150
+    const cfgTermSpeedMs = cfgTermSpeedKt * KT_TO_MS
+    const startAlt = engageCfg?.engageAltitude ?? 1500
+    const prevTermAlt = prevValues?.alt_msl ?? startAlt
+    const diveRad = cfgDiveAngle * Math.PI / 180
+
+    // Target vertical speed from geometry
+    const targetVs = -cfgTermSpeedMs * Math.sin(diveRad)
+
+    // Smooth VS ramp — limit acceleration to 8 m/s² for realistic pushover
+    const prevVs = prevValues?.vs ?? 0
+    const maxVsAccel = 8 // m/s² — realistic for a pushover maneuver
+    const vsError = targetVs - prevVs
+    values.vs = prevVs + clamp(vsError, -maxVsAccel * dt, maxVsAccel * dt)
+
+    // Altitude from integrated VS
+    values.alt_msl = Math.max(0, prevTermAlt + values.vs * dt)
+    values.alt_agl = Math.max(0, values.alt_msl - TERRAIN_ELEV_M)
+
+    // Pitch = dive angle (constant during dive)
+    targetPitch = -cfgDiveAngle + jitter(simTime, 0.1, 1)
+    // Throttle: high to maintain terminal speed
+    targetThrottle = 90 + jitter(simTime, 0.05, 2)
+    // IAS ramps toward terminal speed
+    const prevIasLocal = prevValues?.ias ?? CRUISE_IAS_KT
+    targetIas = prevIasLocal + (cfgTermSpeedKt - prevIasLocal) * Math.min(1, dt * 0.5)
+
+    // Impact detection
+    if (values.alt_msl <= IMPACT_ALT_M) {
+      values.flt_phase = 7
+    }
   } else {
+    // POST_MSN: impact
     targetThrottle = 0
-    targetPitch = -70
+    targetPitch = -(engageCfg?.diveAngle ?? 70)
     targetIas = 0
     values.vs = -50
     values.alt_msl = 0
@@ -255,7 +406,7 @@ export function generateTelemetryFrame(
   // Physics-based turn: max turn rate limited by bank angle and airspeed
   // Shahed-136: max bank ~25°, at 95kt → turn rate ~5.4°/s, radius ~520m
   const vMs = values.ias * KT_TO_MS
-  const maxBankDeg = 25 // max coordinated bank angle
+  const maxBankDeg = MAX_BANK_DEG
   const maxBankRad = maxBankDeg * Math.PI / 180
   // Max turn rate = g * tan(bank) / V (rad/s) → convert to deg/s
   const maxTurnRate = vMs > 5 ? (G * Math.tan(maxBankRad) / vMs) * 180 / Math.PI : 3
@@ -266,7 +417,21 @@ export function generateTelemetryFrame(
   if (spoofActive && !spoofDetected) headingNoise += jitter(simTime, 0.003, 0.2)
   else if (spoofDetected) headingNoise += jitter(simTime, 0.008, 0.8)
 
-  const desiredHeading = (bearing + headingNoise + 360) % 360
+  // In loiter, fly tangent to orbit circle; in engaging, approach from attack bearing
+  let targetBearing = bearing // default: fly toward target/home
+  if (phase === 4 && values._loiterBearing !== undefined) {
+    // LOITER: fly tangent to orbit with radius correction
+    targetBearing = values._loiterBearing
+  } else if (flow === 'ENGAGING' && values._engageBearing !== undefined) {
+    // ENGAGING: fly to IP then inbound on attack bearing
+    targetBearing = values._engageBearing
+  } else if (flow === 'TERMINAL') {
+    // TERMINAL: proportional navigation — steer toward actual target position
+    // The attack bearing established the approach direction, but during dive
+    // the guidance must correct for any lateral offset to hit the target precisely
+    targetBearing = bearing // great-circle bearing to target = guaranteed impact
+  }
+  const desiredHeading = (targetBearing + headingNoise + 360) % 360
 
   // Current heading from previous frame
   const prevPsi = prevValues?.psi ?? desiredHeading
@@ -480,8 +645,8 @@ export function generateTelemetryFrame(
   } else if (phase === 7) {
     values.arm_status = 3
     values.fuze_mode = 1
-    values.imp_angle = 70
-    values.term_vel = Math.round(180 + jitter(simTime, 0.1, 5))
+    values.imp_angle = engageCfg?.diveAngle ?? 45
+    values.term_vel = Math.round((engageCfg?.terminalSpeed ?? 150) * KT_TO_MS)
   }
 
   // ════════════════════════════════════════════════

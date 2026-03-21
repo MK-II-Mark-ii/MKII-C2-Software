@@ -135,16 +135,88 @@ export function useSimulation() {
         const activeTarget = TARGET_LOCATIONS.find(t => t.id === uiState.committedTargetId)
         const telemetryValues = generateTelemetryFrame(
           simTime, prevTelemetryValues.current, dt, faults, techniqueStates, fusionState,
-          uiState.missionFlow, activeTarget?.lat, activeTarget?.lon,
+          uiState.missionFlow, activeTarget?.lat, activeTarget?.lon, uiState.engagementConfig,
         )
+        // Save ref to previous frame before overwriting
+        const prevTelFrame = prevTelemetryValues.current
         prevTelemetryValues.current = telemetryValues
         useTelemetryStore.getState().updateValues(telemetryValues)
 
-        // 8. Check mission complete or RTH landed
+        // 8. State transitions
         const currentFlow = useUIStore.getState().missionFlow
-        if (Math.round(telemetryValues.flt_phase) === 7 && currentFlow === 'LAUNCHED' && !useUIStore.getState().missionComplete) {
+
+        // Auto-enter loiter when within 5km of target during LAUNCHED
+        // Auto-enter loiter when within 5km of target
+        if (currentFlow === 'LAUNCHED' && telemetryValues.wpt_dist < 5000 && simTime > 45) {
+          useUIStore.getState().setMissionFlow('LOITERING')
+          useUIStore.getState().setEngagementDialogOpen(true)
+          addAction(makeAction('ALERT', 'LOITER ENTERED', 'Target area reached — orbiting at 2.5km radius. Configure engagement.', simTime))
+        }
+
+        // LOITERING + engageRequested → orbit to correct angular position, then ENGAGING
+        if (currentFlow === 'LOITERING' && uiState.engageRequested) {
+          const attackBrg = uiState.engagementConfig.attackBearing
+          const ipAngle = attackBrg
+          const dirLabels: Record<number, string> = { 0:'N', 45:'NE', 90:'E', 135:'SE', 180:'S', 225:'SW', 270:'W', 315:'NW' }
+          const dirLabel = dirLabels[attackBrg] ?? `${attackBrg}°`
+
+          const tgtLat = activeTarget?.lat ?? 24.8359
+          const tgtLon = activeTarget?.lon ?? 66.9832
+          const lmLat = telemetryValues.lat ?? 0
+          const lmLon = telemetryValues.lon ?? 0
+          const dLatT = lmLat - tgtLat
+          const dLonT = (lmLon - tgtLon) * Math.cos(tgtLat * Math.PI / 180)
+          const currentAngleDeg = ((Math.atan2(dLonT, dLatT) * 180 / Math.PI) + 360) % 360
+
+          let angError = ipAngle - currentAngleDeg
+          if (angError > 180) angError -= 360
+          if (angError < -180) angError += 360
+
+          // Only notify once when engage is first requested
+          if (!prevTelFrame?._engageNotified) {
+            telemetryValues._engageNotified = 1
+            const errorDeg = Math.round(Math.abs(angError))
+            addAction(makeAction('NAV_SWITCH', 'POSITIONING',
+              `Orbiting to ${dirLabel} approach angle — ${errorDeg}° remaining`, simTime))
+          } else {
+            telemetryValues._engageNotified = 1
+          }
+
+          if (Math.abs(angError) < 15) {
+            useUIStore.getState().setMissionFlow('ENGAGING')
+            useUIStore.getState().setEngageRequested(false)
+            const inboundHdg = (attackBrg + 180) % 360
+            addAction(makeAction('ALERT', 'INBOUND',
+              `Breaking orbit — attack from ${dirLabel}, inbound heading ${inboundHdg}°`, simTime))
+          }
+        }
+
+        // ENGAGING → TERMINAL when at dive start point
+        if (currentFlow === 'ENGAGING' && telemetryValues._readyForTerminal === 1) {
+          const cfg = uiState.engagementConfig
+          useUIStore.getState().setMissionFlow('TERMINAL')
+          addAction(makeAction('ALERT', 'TERMINAL DIVE',
+            `Dive initiated — angle ${cfg.diveAngle}°, target speed ${cfg.terminalSpeed}kt, from ${cfg.engageAltitude}m`, simTime))
+        }
+
+        // TERMINAL: disable abort below 100m AGL (one-time notification)
+        if (currentFlow === 'TERMINAL') {
+          const prevAltFlag = prevTelFrame?._termAltFlag ?? 0
+          if (telemetryValues.alt_agl < 100 && prevAltFlag < 1) {
+            telemetryValues._termAltFlag = 1
+            useUIStore.getState().setAbortAvailable(false)
+            addAction(makeAction('SPOOF_DETECT', 'COMMITTED', 'Point of no return — abort disabled', simTime))
+          } else {
+            telemetryValues._termAltFlag = prevAltFlag
+          }
+        }
+
+        // Contact
+        if (Math.round(telemetryValues.flt_phase) === 7 && (currentFlow === 'TERMINAL' || currentFlow === 'LAUNCHED') && !useUIStore.getState().missionComplete) {
           useUIStore.getState().setMissionComplete(true)
         }
+
+        // RTH landed
         if (telemetryValues._landed === 1 && currentFlow === 'RTH') {
           useUIStore.getState().setMissionFlow('LANDED')
         }

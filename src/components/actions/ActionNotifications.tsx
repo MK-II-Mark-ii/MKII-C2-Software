@@ -16,6 +16,14 @@ const TOAST_DURATION = 4000 // ms before toast fades out
 export default function ActionNotifications() {
   const actionLog = useUIStore((s) => s.actionLog)
   const toggleRight = useUIStore((s) => s.toggleRightPanel)
+  const setTab = useUIStore((s) => s.setRightPanelTab)
+
+  const openActionsPanel = () => {
+    setTab('actions')
+    if (!useUIStore.getState().rightPanelOpen) {
+      toggleRight()
+    }
+  }
   const [visibleToasts, setVisibleToasts] = useState<string[]>([])
   const prevCountRef = useRef(actionLog.length)
 
@@ -46,7 +54,7 @@ export default function ActionNotifications() {
     <>
       {/* Expand button — top-right, same position as panel close button */}
       <button
-        onClick={toggleRight}
+        onClick={openActionsPanel}
         className="flex items-center justify-center gap-1.5 font-mono text-xs tracking-wider uppercase"
         style={{
           position: 'absolute',
@@ -90,7 +98,7 @@ export default function ActionNotifications() {
         return (
           <div
             key={entry.id}
-            onClick={toggleRight}
+            onClick={openActionsPanel}
             style={{
               padding: '8px 10px',
               borderRadius: '8px',

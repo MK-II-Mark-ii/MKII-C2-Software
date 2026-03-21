@@ -10,6 +10,7 @@ import SphereViewport from '../spheres/SphereViewport'
 import MapView from '../map/MapView'
 import TelemetryPage from '../telemetry-page/TelemetryPage'
 import HudOverlay from '../hud/HudOverlay'
+import EngagementDialog from '../actions/EngagementPanel'
 import { useUIStore } from '../../stores/uiStore'
 import { useSimulation } from '../../hooks/useSimulation'
 import { useFaultStore } from '../../stores/faultStore'
@@ -28,6 +29,7 @@ function CenterViewport() {
       }}>
         <MapView />
         {mode === 'MAP' && <HudOverlay />}
+        {mode === 'MAP' && <EngagementDialog />}
       </div>
 
       {/* Other views mount/unmount normally */}

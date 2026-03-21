@@ -17,7 +17,8 @@ const X_WINDOWS = [
 export default function TelemetryPage() {
   const values = useTelemetryStore((s) => s.values)
   const history = useTelemetryStore((s) => s.history)
-  const [activeCategory, setActiveCategory] = useState<TelemetryCategory>('FLIGHT')
+  const activeCategory = useTelemetryStore((s) => s.activeCategory)
+  const setActiveCategory = useTelemetryStore((s) => s.setActiveCategory)
   const [yScale, setYScale] = useState<YScaleMode>('auto')
   const [xWindow, setXWindow] = useState(0)
   const tabsRef = useRef<HTMLDivElement>(null)

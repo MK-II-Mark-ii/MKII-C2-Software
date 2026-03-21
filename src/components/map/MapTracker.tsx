@@ -244,160 +244,33 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
   return (
     <>
       {/* Mission complete popup */}
-      {missionComplete && (
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          zIndex: 100,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          backdropFilter: 'blur(4px)',
-        }}>
-          <div style={{
-            backgroundColor: '#0A0E1A',
-            border: '1px solid rgba(0, 229, 255, 0.3)',
-            borderRadius: '12px',
-            padding: '32px 48px',
-            textAlign: 'center',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '16px',
-            boxShadow: '0 0 60px rgba(0, 229, 255, 0.15)',
-          }}>
-            <div style={{
-              width: 64, height: 64, borderRadius: '50%',
-              backgroundColor: 'rgba(0, 229, 255, 0.1)',
-              border: '2px solid #00E5FF',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '28px',
-            }}>
-              ✓
-            </div>
-            <div className="font-mono" style={{
-              fontSize: '18px', fontWeight: 700, color: '#00E5FF',
-              letterSpacing: '0.15em', textTransform: 'uppercase',
-            }}>
-              CONTACT SUCCESSFUL
-            </div>
-            <div className="font-mono" style={{
-              fontSize: '11px', color: '#8899AA', maxWidth: 280,
-            }}>
-              Target neutralized. All mission objectives complete. BDA sensor activated.
-            </div>
-            <button
-              onClick={handleResetMission}
-              className="font-mono"
-              style={{
-                marginTop: '8px',
-                padding: '10px 32px',
-                borderRadius: '8px',
-                border: '1px solid rgba(0, 229, 255, 0.3)',
-                backgroundColor: 'rgba(0, 229, 255, 0.1)',
-                color: '#00E5FF',
-                fontSize: '12px',
-                fontWeight: 600,
-                letterSpacing: '0.1em',
-                cursor: 'pointer',
-                textTransform: 'uppercase',
-              }}
-            >
-              RESET MISSION
-            </button>
-          </div>
-        </div>
-      )}
 
-      {/* RTH Landed popup */}
-      {isLanded && !missionComplete && (
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          zIndex: 100,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          backdropFilter: 'blur(4px)',
-        }}>
-          <div style={{
-            backgroundColor: '#0A0E1A',
-            border: '1px solid rgba(0, 255, 136, 0.3)',
-            borderRadius: '12px',
-            padding: '32px 48px',
-            textAlign: 'center',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '16px',
-            boxShadow: '0 0 60px rgba(0, 255, 136, 0.15)',
-          }}>
-            <div style={{
-              width: 64, height: 64, borderRadius: '50%',
-              backgroundColor: 'rgba(0, 255, 136, 0.1)',
-              border: '2px solid #00FF88',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '28px', color: '#00FF88',
-            }}>
-              ✓
-            </div>
-            <div className="font-mono" style={{
-              fontSize: '18px', fontWeight: 700, color: '#00FF88',
-              letterSpacing: '0.15em', textTransform: 'uppercase',
-            }}>
-              SAFELY RETURNED & CAPTURED
-            </div>
-            <div className="font-mono" style={{
-              fontSize: '11px', color: '#8899AA', maxWidth: 300,
-            }}>
-              LM successfully returned to launch point and captured in safety net. Mission terminated. All systems nominal.
-            </div>
-            <button
-              onClick={handleResetMission}
-              className="font-mono"
-              style={{
-                marginTop: '8px',
-                padding: '10px 32px',
-                borderRadius: '8px',
-                border: '1px solid rgba(0, 255, 136, 0.3)',
-                backgroundColor: 'rgba(0, 255, 136, 0.1)',
-                color: '#00FF88',
-                fontSize: '12px',
-                fontWeight: 600,
-                letterSpacing: '0.1em',
-                cursor: 'pointer',
-                textTransform: 'uppercase',
-              }}
-            >
-              RESET MISSION
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Target crosshair — hide after contact */}
+      {/* Target crosshair — always visible until contact */}
       {tgtScreen && !missionComplete && (
         <div
           style={{
             position: 'absolute',
-            left: tgtScreen.x - 20,
-            top: tgtScreen.y - 20,
-            width: 40,
-            height: 40,
-            zIndex: 5,
+            left: tgtScreen.x - 28,
+            top: tgtScreen.y - 28,
+            width: 56,
+            height: 56,
+            zIndex: 6,
             pointerEvents: 'none',
           }}
           dangerouslySetInnerHTML={{ __html: TARGET_CROSSHAIR_SVG }}
         />
       )}
 
-      {/* HTML aircraft icon overlay — hide after contact */}
+      {/* HTML aircraft icon overlay — clickable to open engagement panel */}
       {lmScreen && !missionComplete && (
         <img
           src={`${import.meta.env.BASE_URL}lm-icon.svg`}
           alt="LM"
+          onClick={() => {
+            useUIStore.getState().setEngagementDialogOpen(
+              !useUIStore.getState().engagementDialogOpen
+            )
+          }}
           style={{
             position: 'absolute',
             left: lmScreen.x - 24,
@@ -405,7 +278,8 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
             width: 48,
             height: 48,
             zIndex: 5,
-            pointerEvents: 'none',
+            pointerEvents: 'auto',
+            cursor: 'pointer',
             transform: `rotate(${lmHeading}deg)`,
             transition: 'left 0.3s linear, top 0.3s linear, transform 0.5s ease-out',
           }}
@@ -479,14 +353,23 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
   )
 }
 
-const TARGET_CROSSHAIR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
-  <circle cx="20" cy="20" r="12" fill="none" stroke="#E24B4A" stroke-width="1.5" opacity="0.7"/>
-  <circle cx="20" cy="20" r="5" fill="none" stroke="#E24B4A" stroke-width="1.5" opacity="0.9"/>
-  <line x1="20" y1="2" x2="20" y2="14" stroke="#E24B4A" stroke-width="1.5"/>
-  <line x1="20" y1="26" x2="20" y2="38" stroke="#E24B4A" stroke-width="1.5"/>
-  <line x1="2" y1="20" x2="14" y2="20" stroke="#E24B4A" stroke-width="1.5"/>
-  <line x1="26" y1="20" x2="38" y2="20" stroke="#E24B4A" stroke-width="1.5"/>
-  <circle cx="20" cy="20" r="1.5" fill="#E24B4A"/>
+const TARGET_CROSSHAIR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56">
+  <!-- Outer ring with pulse -->
+  <circle cx="28" cy="28" r="22" fill="none" stroke="#E24B4A" stroke-width="1.5" opacity="0.4">
+    <animate attributeName="r" values="22;24;22" dur="2s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.4;0.15;0.4" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <!-- Main ring -->
+  <circle cx="28" cy="28" r="16" fill="none" stroke="#E24B4A" stroke-width="2" opacity="0.8"/>
+  <!-- Inner ring -->
+  <circle cx="28" cy="28" r="7" fill="none" stroke="#E24B4A" stroke-width="1.5" opacity="0.9"/>
+  <!-- Crosshair lines -->
+  <line x1="28" y1="2" x2="28" y2="18" stroke="#E24B4A" stroke-width="2"/>
+  <line x1="28" y1="38" x2="28" y2="54" stroke="#E24B4A" stroke-width="2"/>
+  <line x1="2" y1="28" x2="18" y2="28" stroke="#E24B4A" stroke-width="2"/>
+  <line x1="38" y1="28" x2="54" y2="28" stroke="#E24B4A" stroke-width="2"/>
+  <!-- Center dot -->
+  <circle cx="28" cy="28" r="2" fill="#E24B4A"/>
 </svg>`
 
 function BlimpItem({ label, value, color }: { label: string; value: string; color?: string }) {
