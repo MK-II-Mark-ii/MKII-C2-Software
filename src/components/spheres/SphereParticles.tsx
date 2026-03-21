@@ -103,8 +103,11 @@ export default function SphereParticles({ mode, pointSize = 1.8 }: SphereParticl
         cb += w * AXIS_COLORS[a][2]
       }
 
-      // Clamp radius to [0, 1] — 1.0 = perfect sphere surface
-      const r = Math.max(0.05, Math.min(1.0, blendedConf))
+      // Clamp radius:
+      //   THREAT sphere: [0.05, 1.0] — craters inward on degradation
+      //   RESPONSE sphere: [0.05, 1.3] — pushes outward when AI compensates
+      const maxR = mode === 'response' ? 1.3 : 1.0
+      const r = Math.max(0.05, Math.min(maxR, blendedConf))
       radArr[i] = r
       confArr[i] = r
 

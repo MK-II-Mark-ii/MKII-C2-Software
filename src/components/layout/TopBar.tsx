@@ -54,6 +54,7 @@ export default function TopBar() {
 
 function MissionControls() {
   const missionFlow = useUIStore((s) => s.missionFlow)
+  const missionComplete = useUIStore((s) => s.missionComplete)
   const activeTargetId = useUIStore((s) => s.activeTargetId)
   const targetChanged = useUIStore((s) => s.targetChanged)
   const setActiveTarget = useUIStore((s) => s.setActiveTarget)
@@ -72,7 +73,13 @@ function MissionControls() {
   let buttonBorder: string
   let onButtonClick: () => void
 
-  if (isIdle || isLanded) {
+  if (missionComplete) {
+    buttonLabel = 'MISSION COMPLETE'
+    buttonColor = '#5A6A82'
+    buttonBg = 'rgba(255, 255, 255, 0.03)'
+    buttonBorder = 'rgba(255, 255, 255, 0.1)'
+    onButtonClick = () => {}
+  } else if (isIdle || isLanded) {
     buttonLabel = 'LAUNCH'
     buttonColor = '#00FF88'
     buttonBg = 'rgba(0, 255, 136, 0.1)'
@@ -109,7 +116,7 @@ function MissionControls() {
       <select
         value={activeTargetId}
         onChange={(e) => setActiveTarget(e.target.value)}
-        disabled={isRTH}
+        disabled={isRTH || missionComplete}
         className="font-mono"
         style={{
           padding: '4px 8px',
@@ -133,7 +140,7 @@ function MissionControls() {
       {/* Action button */}
       <button
         onClick={onButtonClick}
-        disabled={isRTH}
+        disabled={isRTH || missionComplete}
         className="font-mono"
         style={{
           padding: '5px 16px',

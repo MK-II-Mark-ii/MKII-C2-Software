@@ -528,7 +528,7 @@ export function generateTelemetryFrame(
     // GPS altitude DIVERGES from true altitude — spoofer pushing false altitude
     // Grows over time since spoofing started
     const spoofDuration = simTime - (faults?.spoofingStartedAt ?? simTime)
-    const altDivergence = Math.min(200, spoofDuration * 2.5) // grows at 2.5 m/s
+    const altDivergence = Math.min(500, spoofDuration * 2.5) // grows at 2.5 m/s, caps at 500m
     if (spoofDetected) {
       // After detection: GPS altitude frozen at last spoofed value
       values.alt_gps = prevValues?.alt_gps ?? (altM + altDivergence)
@@ -685,14 +685,38 @@ export function generateTelemetryFrame(
   // Spoofing: datalink unaffected (correct — different frequency band)
 
   // ════════════════════════════════════════════════
-  // 18. PAYLOAD
+  // 18. PAYLOAD — EO/IR sensors activate for:
+  //   a) Terminal engagement (phase >= 5) — target acquisition
+  //   b) Scene Matching navigation (during GPS denial) — terrain/feature matching
+  //   c) TERCOM correlation (during GPS denial) — terrain profile scanning
   // ════════════════════════════════════════════════
+  // GPS denial detected from both fault state AND technique health (belt and suspenders)
+  const gnssHealth = techniques?.GNSS?.health_status
+  const gpsDenied = isJamming || isSpoofing ||
+    gnssHealth === 'DENIED' || gnssHealth === 'SPOOFED' || gnssHealth === 'DEGRADED'
+
   if (phase >= 5) {
-    values.trk_status = phase === 6 ? 2 : 1
-    values.trk_conf = phase === 6 ? Math.round(75 + jitter(simTime, 0.1, 10)) : Math.round(40 + jitter(simTime, 0.08, 8))
+    // Terminal engagement — full sensor activation for target tracking
+    values.sens_mode = phase === 6 ? 3 : 2   // IR_NFOV in terminal, IR_WFOV in ingress
+    values.trk_status = phase === 6 ? 2 : 1  // TRACKING / ACQUIRING
+    values.trk_conf = phase === 6
+      ? Math.round(75 + jitter(simTime, 0.1, 10))
+      : Math.round(40 + jitter(simTime, 0.08, 8))
     values.gmb_el = phase === 6 ? clamp(-60 - values.theta * 0.3, -90, 15) : -45
     values.zoom = phase === 6 ? 20 + jitter(simTime, 0.05, 2) : 8
-    values.sens_mode = 2
+    values.lrf_range = Math.round(values.alt_agl + jitter(simTime, 0.1, 10))
+  } else if (gpsDenied && phase >= 2) {
+    // ── GPS DENIED during cruise/loiter ──
+    // Scene Matching (DSMAC) activates: EO/IR scans terrain features for visual navigation
+    // TERCOM activates: radar altimeter profiles terrain against stored DEM
+    values.sens_mode = 2                     // IR_WFOV — wide field for terrain feature scanning
+    values.gmb_el = -80 + jitter(simTime, 0.04, 4) // near-nadir for terrain correlation
+    values.zoom = 8 + jitter(simTime, 0.03, 1)     // wider zoom for scene matching FOV
+    values.trk_status = 1                    // ACQUIRING — actively scanning terrain features
+    values.trk_conf = Math.round(60 + jitter(simTime, 0.07, 15)) // terrain-dependent confidence
+    values.lrf_range = Math.round(values.alt_agl + jitter(simTime, 0.15, 25)) // laser rangefinder for TERCOM
+    // Gimbal azimuth sweeps to scan terrain features
+    values.gmb_az = jitter(simTime, 0.08, 15) // slow sweep ±15°
   }
 
   // ════════════════════════════════════════════════
