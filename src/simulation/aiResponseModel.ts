@@ -20,8 +20,8 @@ export function deriveResponseTargets(
   const composite = fusion.composite_confidence
 
   return {
-    // INS backbone — always active
-    resp_inertial_lock: 0.94,
+    // INS backbone — boosted under spoofing (INS becomes primary cross-check reference)
+    resp_inertial_lock: faults.spoofing ? 0.98 : 0.94,
 
     // GNSS rejection — active when spoofing detected
     resp_gnss_reject: spoofFlag ? 0.95 : faults.spoofing ? 0.80 : 0.10,
@@ -32,10 +32,16 @@ export function deriveResponseTargets(
     // CRPA null steering — tracks antijam with slight lag (handled by tau)
     resp_crpa_null: faults.jamming ? 0.88 : techniques.GNSS.jamming_detected ? 0.55 : 0.10,
 
-    // Technique activations mirror their confidence (already high nominally)
-    resp_tercom_activate: techniques.TERCOM.confidence_score,
-    resp_magnav_activate: techniques.MAGNAV.confidence_score,
-    resp_scene_activate: techniques.SCENE_MATCH.confidence_score,
+    // Technique activations: boost when GNSS denied (compensating)
+    resp_tercom_activate: anyFault
+      ? Math.min(0.98, techniques.TERCOM.confidence_score + 0.08)
+      : techniques.TERCOM.confidence_score,
+    resp_magnav_activate: anyFault
+      ? Math.min(0.95, techniques.MAGNAV.confidence_score + 0.12)
+      : techniques.MAGNAV.confidence_score,
+    resp_scene_activate: anyFault
+      ? Math.min(0.96, techniques.SCENE_MATCH.confidence_score + 0.07)
+      : techniques.SCENE_MATCH.confidence_score,
 
     // EKF reweighting when composite degrades
     resp_ekf_reweight: composite < 0.85 ? 0.90 : 0.30,

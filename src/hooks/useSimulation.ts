@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useNavigationStore } from '../stores/navigationStore'
 import { useFaultStore } from '../stores/faultStore'
-import { useUIStore } from '../stores/uiStore'
+import { useUIStore, TARGET_LOCATIONS } from '../stores/uiStore'
 import type { ParameterState } from '../stores/navigationStore'
 import type { ActionLogEntry } from '../stores/uiStore'
 import { deriveTechniqueStates, deriveFusionState } from '../data/parameterMap'
@@ -131,13 +131,22 @@ export function useSimulation() {
       // 7. Generate telemetry data (throttled to ~4Hz to avoid store churn)
       if (simTime - lastTelemetryRef.current >= 0.25) {
         lastTelemetryRef.current = simTime
-        const telemetryValues = generateTelemetryFrame(simTime, prevTelemetryValues.current, dt)
+        const uiState = useUIStore.getState()
+        const activeTarget = TARGET_LOCATIONS.find(t => t.id === uiState.committedTargetId)
+        const telemetryValues = generateTelemetryFrame(
+          simTime, prevTelemetryValues.current, dt, faults, techniqueStates, fusionState,
+          uiState.missionFlow, activeTarget?.lat, activeTarget?.lon,
+        )
         prevTelemetryValues.current = telemetryValues
         useTelemetryStore.getState().updateValues(telemetryValues)
 
-        // 8. Check mission complete (POST_MSN phase = target reached)
-        if (Math.round(telemetryValues.flt_phase) === 7 && !useUIStore.getState().missionComplete) {
+        // 8. Check mission complete or RTH landed
+        const currentFlow = useUIStore.getState().missionFlow
+        if (Math.round(telemetryValues.flt_phase) === 7 && currentFlow === 'LAUNCHED' && !useUIStore.getState().missionComplete) {
           useUIStore.getState().setMissionComplete(true)
+        }
+        if (telemetryValues._landed === 1 && currentFlow === 'RTH') {
+          useUIStore.getState().setMissionFlow('LANDED')
         }
       }
 

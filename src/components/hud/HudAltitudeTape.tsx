@@ -1,5 +1,5 @@
 import React from 'react'
-import { HUD_GREEN, HUD_GREEN_DIM, HUD_BG, HUD_AMBER, HUD_FONT, ALT_PX_PER_M, HUD_SHADOW_FILTER } from './hudConstants'
+import { HUD_GREEN, HUD_GREEN_DIM, HUD_BG, HUD_AMBER, HUD_RED, HUD_FONT, ALT_PX_PER_M, HUD_SHADOW_FILTER } from './hudConstants'
 
 interface Props {
   altitude: number  // meters MSL
@@ -38,12 +38,16 @@ export default function HudAltitudeTape({ altitude, vs }: Props) {
     )
   }
 
-  // VS arrow
-  const vsMax = 20
+  // VS arrow — logarithmic scaling for large descent rates
   const maxArrowLen = 80
-  const arrowLen = Math.min(Math.abs(vs) / vsMax, 1) * maxArrowLen
+  // Log scale: 0-20 m/s maps linearly, 20-80 m/s compressed
+  const absVs = Math.abs(vs)
+  const arrowFrac = absVs <= 20
+    ? absVs / 20 * 0.6          // 0-20 m/s → 0-60% of arrow
+    : 0.6 + Math.min(1, (absVs - 20) / 60) * 0.4  // 20-80 m/s → 60-100%
+  const arrowLen = arrowFrac * maxArrowLen
   const vsDir = vs >= 0 ? -1 : 1
-  const vsColor = vs >= 0 ? HUD_GREEN : HUD_AMBER
+  const vsColor = vs >= 0 ? HUD_GREEN : (absVs > 30 ? HUD_RED : HUD_AMBER)
   const vsX = W - 18
 
   return (

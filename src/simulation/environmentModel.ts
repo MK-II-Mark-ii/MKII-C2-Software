@@ -106,7 +106,7 @@ const PHASE_MAP: Record<number, MissionPhase> = {
   0: 'INIT',      // PRE_LCH
   1: 'INIT',      // LAUNCH
   2: 'CLIMB',     // CLIMB
-  3: 'TRANSIT',   // CRUISE
+  3: 'CRUISE',   // CRUISE
   4: 'LOITER',    // LOITER
   5: 'TERMINAL',  // INGRESS
   6: 'TERMINAL',  // TERMINAL
@@ -141,7 +141,7 @@ export function deriveMissionUpdates(
 
   // Live mission phase from telemetry flt_phase
   const fltPhase = Math.round(telemetry?.flt_phase ?? 3)
-  const missionPhase: MissionPhase = PHASE_MAP[fltPhase] ?? 'TRANSIT'
+  const missionPhase: MissionPhase = PHASE_MAP[fltPhase] ?? 'CRUISE'
 
   // Distance to target from telemetry (wpt_dist is in meters)
   const distKm = (telemetry?.wpt_dist ?? 250000) / 1000

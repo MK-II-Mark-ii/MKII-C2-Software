@@ -3,13 +3,23 @@ import { useTelemetryStore } from '../../stores/telemetryStore'
 import { TELEMETRY_PARAMS, TELEMETRY_CATEGORIES, TELEMETRY_PARAM_MAP } from '../../types/telemetry'
 import type { TelemetryCategory } from '../../types/telemetry'
 import TelemetrySparkline from './TelemetrySparkline'
+import type { YScaleMode } from './TelemetrySparkline'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRef } from 'react'
+
+const X_WINDOWS = [
+  { label: 'ALL', value: 0 },
+  { label: '60s', value: 60 },
+  { label: '30s', value: 30 },
+  { label: '10s', value: 10 },
+]
 
 export default function TelemetryPage() {
   const values = useTelemetryStore((s) => s.values)
   const history = useTelemetryStore((s) => s.history)
   const [activeCategory, setActiveCategory] = useState<TelemetryCategory>('FLIGHT')
+  const [yScale, setYScale] = useState<YScaleMode>('auto')
+  const [xWindow, setXWindow] = useState(0)
   const tabsRef = useRef<HTMLDivElement>(null)
 
   const categoryParams = TELEMETRY_PARAMS.filter((p) => p.category === activeCategory)
@@ -93,7 +103,65 @@ export default function TelemetryPage() {
         </button>
       </div>
 
-      {/* All params as sparkline graphs under their respective category tab */}
+      {/* Graph controls: Y scale + X window */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '6px 12px',
+        borderBottom: '1px solid rgba(255,255,255,0.04)',
+        flexShrink: 0,
+      }}>
+        {/* Y-axis scale toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span className="font-mono" style={{ fontSize: '8px', color: '#5A6A82', letterSpacing: '0.08em' }}>Y-AXIS</span>
+          <div style={{ display: 'flex', gap: '2px', padding: '2px 3px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            {(['auto', 'full'] as YScaleMode[]).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setYScale(mode)}
+                className="font-mono"
+                style={{
+                  padding: '2px 8px', borderRadius: '3px', border: 'none', cursor: 'pointer',
+                  fontSize: '9px', fontWeight: 600, textTransform: 'uppercase',
+                  backgroundColor: yScale === mode ? 'rgba(0,229,255,0.12)' : 'transparent',
+                  color: yScale === mode ? '#00E5FF' : '#5A6A82',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {mode === 'auto' ? 'AUTO' : 'FULL'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ width: '1px', height: '16px', backgroundColor: 'rgba(255,255,255,0.06)' }} />
+
+        {/* X-axis time window */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span className="font-mono" style={{ fontSize: '8px', color: '#5A6A82', letterSpacing: '0.08em' }}>X-WINDOW</span>
+          <div style={{ display: 'flex', gap: '2px', padding: '2px 3px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            {X_WINDOWS.map((w) => (
+              <button
+                key={w.value}
+                onClick={() => setXWindow(w.value)}
+                className="font-mono"
+                style={{
+                  padding: '2px 8px', borderRadius: '3px', border: 'none', cursor: 'pointer',
+                  fontSize: '9px', fontWeight: 600,
+                  backgroundColor: xWindow === w.value ? 'rgba(0,229,255,0.12)' : 'transparent',
+                  color: xWindow === w.value ? '#00E5FF' : '#5A6A82',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {w.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Graph grid */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px', minHeight: 0 }}>
         <div style={{
           display: 'grid',
@@ -106,7 +174,9 @@ export default function TelemetryPage() {
               param={p}
               value={values[p.id] ?? p.nominalCruise}
               history={history[p.id] ?? []}
-              height={56}
+              height={90}
+              yScale={yScale}
+              xWindow={xWindow}
             />
           ))}
         </div>

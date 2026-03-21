@@ -56,6 +56,8 @@ function getTau(paramId: string): TauConfig {
 export interface FaultState {
   jamming: boolean
   spoofing: boolean
+  jammingStartedAt?: number | null
+  spoofingStartedAt?: number | null
 }
 
 /**

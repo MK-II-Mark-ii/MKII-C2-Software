@@ -28,7 +28,7 @@ export const TECHNIQUE_COLORS: Record<TechniqueId, string> = {
 
 export type HealthStatus = 'NOMINAL' | 'DEGRADED' | 'DENIED' | 'SPOOFED'
 
-export type MissionPhase = 'INIT' | 'CLIMB' | 'TRANSIT' | 'LOITER' | 'TERMINAL' | 'BDA'
+export type MissionPhase = 'INIT' | 'CLIMB' | 'CRUISE' | 'LOITER' | 'TERMINAL' | 'BDA'
 
 export type DataLinkStatus = 'UP' | 'DEGRADED' | 'DENIED'
 
@@ -153,7 +153,7 @@ export function defaultFusionState(): FusionState {
 
 export function defaultMissionState(): MissionState {
   return {
-    mission_phase: 'TRANSIT',
+    mission_phase: 'CRUISE',
     distance_to_target_km: 500,
     cep_threshold_m: 200,
     time_in_denial_s: 0,

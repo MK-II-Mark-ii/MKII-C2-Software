@@ -51,14 +51,14 @@ export const TELEMETRY_CATEGORIES: { id: TelemetryCategory; label: string; color
 
 export const TELEMETRY_PARAMS: TelemetryParamDef[] = [
   // ── FLIGHT DYNAMICS (12) ──
-  { id: 'ias', label: 'Indicated Airspeed', shortLabel: 'IAS', unit: 'kt', min: 0, max: 180, nominalCruise: 95, category: 'FLIGHT', format: 'int', warningLow: 60, criticalLow: 45, warningHigh: 150, criticalHigh: 165 },
-  { id: 'tas', label: 'True Airspeed', shortLabel: 'TAS', unit: 'kt', min: 0, max: 200, nominalCruise: 102, category: 'FLIGHT', format: 'int' },
-  { id: 'mach', label: 'Mach Number', shortLabel: 'MACH', unit: '', min: 0, max: 0.35, nominalCruise: 0.15, category: 'FLIGHT', format: 'float2' },
+  { id: 'ias', label: 'Indicated Airspeed', shortLabel: 'IAS', unit: 'kt', min: 0, max: 250, nominalCruise: 95, category: 'FLIGHT', format: 'int', warningLow: 60, criticalLow: 45, warningHigh: 200, criticalHigh: 230 },
+  { id: 'tas', label: 'True Airspeed', shortLabel: 'TAS', unit: 'kt', min: 0, max: 280, nominalCruise: 102, category: 'FLIGHT', format: 'int' },
+  { id: 'mach', label: 'Mach Number', shortLabel: 'MACH', unit: '', min: 0, max: 0.55, nominalCruise: 0.15, category: 'FLIGHT', format: 'float2' },
   { id: 'alt_msl', label: 'Altitude MSL', shortLabel: 'MSL', unit: 'm', min: 0, max: 5000, nominalCruise: 2000, category: 'FLIGHT', format: 'int', warningLow: 200, criticalLow: 50 },
   { id: 'alt_agl', label: 'Altitude AGL', shortLabel: 'AGL', unit: 'm', min: 0, max: 5000, nominalCruise: 1500, category: 'FLIGHT', format: 'int', warningLow: 100, criticalLow: 30 },
-  { id: 'vs', label: 'Vertical Speed', shortLabel: 'VS', unit: 'm/s', min: -30, max: 30, nominalCruise: 0, category: 'FLIGHT', format: 'float1' },
+  { id: 'vs', label: 'Vertical Speed', shortLabel: 'VS', unit: 'm/s', min: -80, max: 30, nominalCruise: 0, category: 'FLIGHT', format: 'float1' },
   { id: 'phi', label: 'Roll Angle', shortLabel: 'ROLL', unit: 'deg', min: -60, max: 60, nominalCruise: 0, category: 'FLIGHT', format: 'float1', warningHigh: 45, criticalHigh: 55 },
-  { id: 'theta', label: 'Pitch Angle', shortLabel: 'PITCH', unit: 'deg', min: -30, max: 30, nominalCruise: -2, category: 'FLIGHT', format: 'float1' },
+  { id: 'theta', label: 'Pitch Angle', shortLabel: 'PITCH', unit: 'deg', min: -90, max: 45, nominalCruise: -2, category: 'FLIGHT', format: 'float1' },
   { id: 'psi', label: 'Heading', shortLabel: 'HDG', unit: 'deg', min: 0, max: 360, nominalCruise: 220, category: 'FLIGHT', format: 'int' },
   { id: 'roll_rate', label: 'Roll Rate', shortLabel: 'P', unit: 'deg/s', min: -120, max: 120, nominalCruise: 0, category: 'FLIGHT', format: 'float1' },
   { id: 'pitch_rate', label: 'Pitch Rate', shortLabel: 'Q', unit: 'deg/s', min: -60, max: 60, nominalCruise: 0, category: 'FLIGHT', format: 'float1' },
@@ -74,7 +74,7 @@ export const TELEMETRY_PARAMS: TelemetryParamDef[] = [
   { id: 'oil_p', label: 'Oil Pressure', shortLabel: 'OILP', unit: 'kPa', min: 0, max: 600, nominalCruise: 380, category: 'PROPULSION', format: 'int', warningLow: 200, criticalLow: 100 },
   { id: 'oil_t', label: 'Oil Temperature', shortLabel: 'OILT', unit: '\u00B0C', min: -20, max: 150, nominalCruise: 85, category: 'PROPULSION', format: 'int', warningHigh: 120, criticalHigh: 140 },
   { id: 'thr_pos', label: 'Throttle Position', shortLabel: 'THR', unit: '%', min: 0, max: 100, nominalCruise: 55, category: 'PROPULSION', format: 'int' },
-  { id: 'prop_pitch', label: 'Prop Pitch', shortLabel: 'PPCH', unit: 'deg', min: 10, max: 45, nominalCruise: 28, category: 'PROPULSION', format: 'int' },
+  { id: 'prop_pitch', label: 'Prop Pitch (Fixed)', shortLabel: 'PPCH', unit: 'deg', min: 28, max: 28, nominalCruise: 28, category: 'PROPULSION', format: 'int' },
 
   // ── NAVIGATION (12) ──
   { id: 'lat', label: 'Latitude', shortLabel: 'LAT', unit: 'deg', min: -90, max: 90, nominalCruise: 26.9167, category: 'NAVIGATION', format: 'float4' },
@@ -156,7 +156,7 @@ export const TELEMETRY_PARAMS: TelemetryParamDef[] = [
   { id: 'arm_status', label: 'Arm Status', shortLabel: 'ARM', unit: '', min: 0, max: 3, nominalCruise: 0, category: 'WARHEAD', format: 'enum', enumLabels: ['SAFE', 'ARM_CMD', 'ARMED', 'FUZE_EN'] },
   { id: 'fuze_mode', label: 'Fuze Mode', shortLabel: 'FUZE', unit: '', min: 0, max: 3, nominalCruise: 0, category: 'WARHEAD', format: 'enum', enumLabels: ['SAFE', 'CONTACT', 'PROXIMITY', 'DELAY'] },
   { id: 'imp_angle', label: 'Impact Angle', shortLabel: 'IMPA', unit: 'deg', min: 0, max: 90, nominalCruise: 0, category: 'WARHEAD', format: 'int' },
-  { id: 'term_vel', label: 'Terminal Velocity', shortLabel: 'TVEL', unit: 'm/s', min: 0, max: 120, nominalCruise: 0, category: 'WARHEAD', format: 'int' },
+  { id: 'term_vel', label: 'Terminal Velocity', shortLabel: 'TVEL', unit: 'm/s', min: 0, max: 200, nominalCruise: 0, category: 'WARHEAD', format: 'int' },
   { id: 'whd_cont', label: 'Warhead Continuity', shortLabel: 'WCNT', unit: '', min: 0, max: 1, nominalCruise: 1, category: 'WARHEAD', format: 'bool' },
   { id: 'safety_il', label: 'Safety Interlocks', shortLabel: 'SAFE', unit: '', min: 0, max: 255, nominalCruise: 255, category: 'WARHEAD', format: 'hex' },
 ]

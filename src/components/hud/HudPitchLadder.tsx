@@ -13,9 +13,9 @@ export default function HudPitchLadder({ pitch, roll }: Props) {
   const cy = SIZE / 2
   const pitchOffset = pitch * PITCH_PX_PER_DEG
 
-  // Generate pitch lines from -30 to +30
+  // Generate pitch lines from -90 to +45
   const lines: React.ReactElement[] = []
-  for (let deg = -30; deg <= 30; deg += 5) {
+  for (let deg = -90; deg <= 45; deg += 5) {
     if (deg === 0) continue
     const isMajor = deg % 10 === 0
     const halfW = isMajor ? 55 : 28

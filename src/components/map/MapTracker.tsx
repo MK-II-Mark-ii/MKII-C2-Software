@@ -2,17 +2,15 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTelemetryStore } from '../../stores/telemetryStore'
 import { useUIStore } from '../../stores/uiStore'
 
-// Mission route
-const ORIGIN = { lat: 26.9167, lng: 70.9000 }  // 26°55'N 70°54'E
-const TARGET = { lat: 24.8359, lng: 66.9832 }   // Target location
+const ORIGIN = { lat: 26.9167, lng: 70.9000 }
 
-function generatePlannedRoute(steps = 100): { lat: number; lng: number }[] {
+function generatePlannedRoute(target: { lat: number; lng: number }, steps = 100): { lat: number; lng: number }[] {
   const pts: { lat: number; lng: number }[] = []
   for (let i = 0; i <= steps; i++) {
     const t = i / steps
     pts.push({
-      lat: ORIGIN.lat + (TARGET.lat - ORIGIN.lat) * t,
-      lng: ORIGIN.lng + (TARGET.lng - ORIGIN.lng) * t,
+      lat: ORIGIN.lat + (target.lat - ORIGIN.lat) * t,
+      lng: ORIGIN.lng + (target.lng - ORIGIN.lng) * t,
     })
   }
   return pts
@@ -102,7 +100,7 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
     try {
       projectedPolyRef.current = mapplsGlobal.Polyline({
         map: mapInstance,
-        path: generatePlannedRoute(),
+        path: generatePlannedRoute({ lat: 24.8359, lng: 66.9832 }),
         strokeColor: '#00E5FF',
         strokeOpacity: 0.25,
         strokeWeight: 2,
@@ -133,7 +131,9 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
       const pt = projectToScreen(lat, lon)
       if (pt) setLmScreen(pt)
       // Target crosshair
-      const tpt = projectToScreen(TARGET.lat, TARGET.lng)
+      const tgtLat = vals.tgt_lat ?? 24.8359
+      const tgtLon = vals.tgt_lon ?? 66.9832
+      const tpt = projectToScreen(tgtLat, tgtLon)
       if (tpt) setTgtScreen(tpt)
       // Update icon rotation when map bearing changes (2D/3D switch)
       const heading = vals.psi ?? 0
@@ -176,7 +176,9 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
       // Project to screen for HTML overlays
       const pt = projectToScreen(lat, lon)
       if (pt) setLmScreen(pt)
-      const tpt = projectToScreen(TARGET.lat, TARGET.lng)
+      const tgtLat = state.values.tgt_lat ?? 24.8359
+      const tgtLon = state.values.tgt_lon ?? 66.9832
+      const tpt = projectToScreen(tgtLat, tgtLon)
       if (tpt) setTgtScreen(tpt)
 
       // Append to trail
@@ -216,27 +218,17 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
   // Telemetry for blimp overlay
   const values = useTelemetryStore((s) => s.values)
   const missionComplete = useUIStore((s) => s.missionComplete)
+  const missionFlow = useUIStore((s) => s.missionFlow)
+  const isLanded = missionFlow === 'LANDED'
   const phase = PHASE_LABELS[Math.round(values.flt_phase ?? 3)] ?? 'CRUISE'
   const speed = Math.round(values.gs ?? 0)
   const alt = Math.round(values.alt_msl ?? 2000)
   const distKm = Math.round((values.wpt_dist ?? 0) / 1000)
 
   const handleResetMission = () => {
-    // Reset mission complete flag
-    useUIStore.getState().setMissionComplete(false)
-    // Reset simulation time and telemetry
-    useUIStore.getState().setSimulationTime(0)
-    useUIStore.getState().setPlaybackSpeed(1)
-    // Clear telemetry to force re-init from nominals
-    useTelemetryStore.getState().updateValues({})
-    // Clear trail
-    trailRef.current = []
-    if (trailPolyRef.current) {
-      try { trailPolyRef.current.setPath([ORIGIN, ORIGIN]) } catch { /* ignore */ }
-    }
-    // Reload page to fully reset simulation state
     window.location.reload()
   }
+
 
   return (
     <>
@@ -294,6 +286,73 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
                 border: '1px solid rgba(0, 229, 255, 0.3)',
                 backgroundColor: 'rgba(0, 229, 255, 0.1)',
                 color: '#00E5FF',
+                fontSize: '12px',
+                fontWeight: 600,
+                letterSpacing: '0.1em',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+              }}
+            >
+              RESET MISSION
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* RTH Landed popup */}
+      {isLanded && !missionComplete && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 100,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          backdropFilter: 'blur(4px)',
+        }}>
+          <div style={{
+            backgroundColor: '#0A0E1A',
+            border: '1px solid rgba(0, 255, 136, 0.3)',
+            borderRadius: '12px',
+            padding: '32px 48px',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '16px',
+            boxShadow: '0 0 60px rgba(0, 255, 136, 0.15)',
+          }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: '50%',
+              backgroundColor: 'rgba(0, 255, 136, 0.1)',
+              border: '2px solid #00FF88',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '28px', color: '#00FF88',
+            }}>
+              ✓
+            </div>
+            <div className="font-mono" style={{
+              fontSize: '18px', fontWeight: 700, color: '#00FF88',
+              letterSpacing: '0.15em', textTransform: 'uppercase',
+            }}>
+              SAFELY RETURNED & CAPTURED
+            </div>
+            <div className="font-mono" style={{
+              fontSize: '11px', color: '#8899AA', maxWidth: 300,
+            }}>
+              LM successfully returned to launch point and captured in safety net. Mission terminated. All systems nominal.
+            </div>
+            <button
+              onClick={handleResetMission}
+              className="font-mono"
+              style={{
+                marginTop: '8px',
+                padding: '10px 32px',
+                borderRadius: '8px',
+                border: '1px solid rgba(0, 255, 136, 0.3)',
+                backgroundColor: 'rgba(0, 255, 136, 0.1)',
+                color: '#00FF88',
                 fontSize: '12px',
                 fontWeight: 600,
                 letterSpacing: '0.1em',
