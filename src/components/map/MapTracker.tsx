@@ -37,6 +37,8 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
   // Screen positions for HTML overlays
   const [lmScreen, setLmScreen] = useState<{ x: number; y: number } | null>(null)
   const [tgtScreen, setTgtScreen] = useState<{ x: number; y: number } | null>(null)
+  // Use a cumulative rotation angle (not clamped to 0-360) to avoid CSS wrap jumps
+  const lmHeadingRef = useRef(0)
   const [lmHeading, setLmHeading] = useState(0)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -92,8 +94,8 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
     try {
       if (typeof mapInstance.setCenter === 'function') mapInstance.setCenter(ORIGIN)
       if (typeof mapInstance.setZoom === 'function') mapInstance.setZoom(7)
-      if (typeof mapInstance.setPitch === 'function') mapInstance.setPitch(45)
-      if (typeof mapInstance.setBearing === 'function') mapInstance.setBearing(30)
+      if (typeof mapInstance.setPitch === 'function') mapInstance.setPitch(0)
+      if (typeof mapInstance.setBearing === 'function') mapInstance.setBearing(0)
     } catch { /* ignore */ }
 
     // Projected route (dashed, dim)
@@ -139,7 +141,11 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
       const heading = vals.psi ?? 0
       let mapBearing = 0
       try { mapBearing = mapInstance.getBearing?.() ?? 0 } catch { /* ignore */ }
-      setLmHeading(heading - mapBearing)
+      const targetDeg = heading - mapBearing
+      let hdgDiff = targetDeg - lmHeadingRef.current
+      hdgDiff = ((hdgDiff + 180) % 360 + 360) % 360 - 180
+      lmHeadingRef.current += hdgDiff
+      setLmHeading(lmHeadingRef.current)
     }
     try {
       mapInstance.on('move', reproject)
@@ -171,7 +177,13 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
       // Subtract map bearing so icon always points in correct screen direction
       let mapBearing = 0
       try { mapBearing = mapInstance.getBearing?.() ?? 0 } catch { /* ignore */ }
-      setLmHeading(heading - mapBearing)
+      // Unwrap to avoid CSS rotation jumping (e.g. 350→10 should go +20, not -340)
+      const targetDeg = heading - mapBearing
+      let diff = targetDeg - lmHeadingRef.current
+      // Normalize to [-180, 180]
+      diff = ((diff + 180) % 360 + 360) % 360 - 180
+      lmHeadingRef.current += diff
+      setLmHeading(lmHeadingRef.current)
 
       // Project to screen for HTML overlays
       const pt = projectToScreen(lat, lon)
@@ -389,14 +401,14 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
           alt="LM"
           style={{
             position: 'absolute',
-            left: lmScreen.x - 32,
-            top: lmScreen.y - 32,
-            width: 64,
-            height: 64,
+            left: lmScreen.x - 24,
+            top: lmScreen.y - 24,
+            width: 48,
+            height: 48,
             zIndex: 5,
             pointerEvents: 'none',
             transform: `rotate(${lmHeading}deg)`,
-            transition: 'left 0.25s linear, top 0.25s linear, transform 0.25s linear',
+            transition: 'left 0.3s linear, top 0.3s linear, transform 0.5s ease-out',
           }}
         />
       )}
