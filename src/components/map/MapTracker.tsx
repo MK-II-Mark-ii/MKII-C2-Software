@@ -212,10 +212,9 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
           isAnimatingRef.current = true
           try {
             if (typeof mapInstance.easeTo === 'function') {
-              mapInstance.easeTo({ center: pos, bearing: heading, pitch: 50, zoom: 9, duration: 2000 })
+              mapInstance.easeTo({ center: pos, duration: 2000 })
             } else {
               if (typeof mapInstance.setCenter === 'function') mapInstance.setCenter(pos)
-              if (typeof mapInstance.setBearing === 'function') mapInstance.setBearing(heading)
             }
           } catch { /* ignore */ }
           // Clear animation flag after easeTo completes
@@ -445,10 +444,9 @@ export default function MapTracker({ mapInstance }: MapTrackerProps) {
           setCameraLocked(true)
           const lat = useTelemetryStore.getState().values.lat
           const lon = useTelemetryStore.getState().values.lon
-          const hdg = useTelemetryStore.getState().values.psi ?? 0
           if (lat && lon) {
             try {
-              mapInstance.easeTo?.({ center: { lat, lng: lon }, bearing: hdg, pitch: 50, zoom: 9, duration: 1000 })
+              mapInstance.easeTo?.({ center: { lat, lng: lon }, duration: 1000 })
             } catch { /* ignore */ }
             setTimeout(() => { isAnimatingRef.current = false }, 1200)
           } else {
