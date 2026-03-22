@@ -59,51 +59,47 @@ export function getThreatConfidences(storeParams: Record<string, ParameterState>
 }
 
 /**
- * RESPONSE sphere: compute per-axis confidence.
+ * RESPONSE sphere: soft activation-weighted averaging.
  *
- * Response params have two states:
- *   - DORMANT (< 0.20): countermeasure is off, not needed
- *   - ACTIVE  (>= 0.20): countermeasure is responding
+ * Each param's contribution is weighted by how "active" it is:
+ *   weight(c) = c²  — dormant (0.10) contributes 0.01, active (1.0) contributes 1.0
  *
- * Dormant params must NOT contribute to the axis — they are "off switches",
- * not degradation indicators. Only active params drive the sphere shape.
+ * The axis value blends toward nominal (0.95) when all params are dormant,
+ * and smoothly transitions toward the active param values as they ramp up.
+ * No hard thresholds = no discontinuities.
  *
- * If ALL params on an axis are dormant, the axis shows nominal (0.95) —
- * "no response needed" looks the same as "all systems healthy".
- *
- * If ANY param is active, the axis shows the max active value —
- * the strongest response drives the visual.
+ * Final axis = (Σ w_i * c_i + nominalWeight * 0.95) / (Σ w_i + nominalWeight)
+ * where nominalWeight decays as activation increases.
  */
 export function getResponseConfidences(storeParams: Record<string, ParameterState>): number[] {
-  const DORMANT_THRESHOLD = 0.20
+  const NOMINAL_AXIS_VALUE = 0.95
 
-  const activeSums = [0, 0, 0, 0, 0]
-  const activeMaxes = [0, 0, 0, 0, 0]
-  const activeCounts = [0, 0, 0, 0, 0]
+  const weightedSums = [0, 0, 0, 0, 0]
+  const totalWeights = [0, 0, 0, 0, 0]
+  const maxVals = [0, 0, 0, 0, 0]
 
   for (const p of RESPONSE_SPHERE_PARAMETERS) {
     const axis = GROUP_TO_AXIS[p.group]
     const state = storeParams[p.id]
     if (!state) continue
 
-    // Only count params that are actively responding
-    if (state.confidence >= DORMANT_THRESHOLD) {
-      activeSums[axis] += state.confidence
-      activeCounts[axis]++
-      if (state.confidence > activeMaxes[axis]) {
-        activeMaxes[axis] = state.confidence
-      }
-    }
+    const c = state.confidence
+    // Soft activation weight: c² makes dormant (0.10→0.01) nearly invisible
+    // while active (0.90→0.81) or pushing (1.15→1.32) fully contributes
+    const w = c * c
+    weightedSums[axis] += w * c
+    totalWeights[axis] += w
+    if (c > maxVals[axis]) maxVals[axis] = c
   }
 
-  return activeSums.map((sum, i) => {
-    if (activeCounts[i] === 0) {
-      // All params dormant on this axis — show nominal (no response needed = healthy)
-      return 0.95
-    }
-    const mean = sum / activeCounts[i]
-    const max = activeMaxes[i]
-    // Blend: max dominates but mean provides context
-    return 0.35 * max + 0.65 * mean
+  return weightedSums.map((ws, i) => {
+    const tw = totalWeights[i]
+    // Nominal bias: strong when all params dormant, fades as activation grows
+    // At tw=0.03 (all dormant): nomBias=0.97 → axis ≈ 0.95
+    // At tw=1.0 (one active):   nomBias=0.50 → axis blends toward active value
+    // At tw=3.0 (all active):   nomBias=0.25 → axis dominated by active values
+    const nomBias = 1.0 / (1.0 + tw)
+    const activePart = tw > 0.001 ? ws / tw : NOMINAL_AXIS_VALUE
+    return nomBias * NOMINAL_AXIS_VALUE + (1 - nomBias) * activePart
   })
 }
